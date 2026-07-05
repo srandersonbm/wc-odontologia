@@ -5,7 +5,8 @@ tratamento por paciente, portal do paciente e área administrativa para dentista
 
 ## Estrutura
 
-- `backend/` — API em Node.js + Express + TypeScript, banco SQLite (arquivo local).
+- `backend/` — API em Node.js + Express + TypeScript, banco libSQL (arquivo local em
+  desenvolvimento; Turso hospedado em produção, para persistir os dados).
 - `frontend/` — React + Vite + TypeScript + Tailwind, com calendário e design próprio.
 
 ## Como rodar
@@ -32,6 +33,21 @@ npm run dev
 ```
 
 Acesse http://localhost:5183 — o Vite já faz proxy de `/api` para o backend.
+
+## Deploy gratuito
+
+- **Backend**: Render (free) + Turso (banco libSQL hospedado, persistente e gratuito).
+  Configuração pronta em `render.yaml` — defina as variáveis `TURSO_DATABASE_URL` e
+  `TURSO_AUTH_TOKEN` no painel do Render.
+- **Frontend**: GitHub Pages, via o workflow em
+  `.github/workflows/deploy-pages.yml`. Ative o GitHub Pages nas configurações do
+  repositório (Settings → Pages → Source: GitHub Actions) e crie a variável de
+  repositório `VITE_API_URL` (Settings → Secrets and variables → Actions → Variables)
+  apontando para a URL pública do backend no Render.
+
+O frontend usa `HashRouter` (URLs como `.../#/dashboard`) e caminhos relativos no
+build, o que evita erros 404 ao recarregar a página em qualquer subpasta do
+GitHub Pages.
 
 ## Papéis
 
