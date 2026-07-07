@@ -41,26 +41,6 @@ export interface ProcedureType {
   defaultDurationMin: number;
 }
 
-export interface TaskCategory {
-  id: number;
-  name: string;
-  color: string;
-}
-
-export interface OfficeTask {
-  id: number;
-  title: string;
-  description?: string;
-  date: string;
-  startTime?: string;
-  endTime?: string;
-  dentistId?: number | null;
-  categoryId: number;
-  categoryName: string;
-  categoryColor: string;
-  dentistName?: string;
-}
-
 export interface PlanItem {
   id: number;
   title: string;
@@ -123,6 +103,16 @@ export interface DashboardData {
     dentistName: string;
     kind: string;
   }>;
+}
+
+export type SignedDocumentType = 'ANAMNESIS' | 'TREATMENT_PLAN' | 'TERMO' | 'ATESTADO';
+
+export interface SignedDocument {
+  id: number;
+  planId?: number | null;
+  type: SignedDocumentType;
+  fileName: string;
+  uploadedAt: string;
 }
 
 export interface Anamnesis {

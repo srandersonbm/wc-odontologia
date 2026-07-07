@@ -19,7 +19,7 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
       `SELECT COUNT(*) as c FROM plan_items pi
        JOIN treatment_plans tp ON tp.id = pi.plan_id
        JOIN patients p ON p.id = tp.patient_id
-       WHERE pi.status != 'DONE' AND p.tenant_id = ? ${pendingWhere}`,
+       WHERE pi.status != 'DONE' AND tp.status = 'ACTIVE' AND p.tenant_id = ? ${pendingWhere}`,
       pendingParams
     )
   ).c;
@@ -42,18 +42,7 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
         `SELECT COUNT(*) as c FROM plan_items pi
          JOIN treatment_plans tp ON tp.id = pi.plan_id
          JOIN patients p ON p.id = tp.patient_id
-         WHERE p.tenant_id = ? AND pi.scheduled_date >= ? AND pi.scheduled_date <= ? ${where}`,
-        params
-      )
-    ).c;
-  }
-
-  async function countOfficeTasks(fromDate: string, toDate: string) {
-    const where = dentistId ? 'AND (t.dentist_id = ? OR t.dentist_id IS NULL)' : '';
-    const params = dentistId ? [tenantId, fromDate, toDate, dentistId] : [tenantId, fromDate, toDate];
-    return (
-      await db.get<any>(
-        `SELECT COUNT(*) as c FROM office_tasks t WHERE t.tenant_id = ? AND t.date >= ? AND t.date <= ? ${where}`,
+         WHERE p.tenant_id = ? AND tp.status = 'ACTIVE' AND pi.scheduled_date >= ? AND pi.scheduled_date <= ? ${where}`,
         params
       )
     ).c;
@@ -70,7 +59,7 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
      JOIN treatment_plans tp ON tp.id = pi.plan_id
      JOIN patients p ON p.id = tp.patient_id
      JOIN users d ON d.id = tp.dentist_id
-     WHERE p.tenant_id = ? AND pi.scheduled_date >= ? AND pi.scheduled_date <= ? ${upcomingWhere}
+     WHERE p.tenant_id = ? AND tp.status = 'ACTIVE' AND pi.scheduled_date >= ? AND pi.scheduled_date <= ? ${upcomingWhere}
      ORDER BY pi.scheduled_date, pi.start_time
      LIMIT 8`,
     upcomingParams
@@ -79,10 +68,9 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
   res.json({
     patientCount,
     pendingProcedures,
-    todayCount: (await countAppointments(todayStr, todayStr)) + (await countOfficeTasks(todayStr, todayStr)),
-    tomorrowCount:
-      (await countAppointments(tomorrowStr, tomorrowStr)) + (await countOfficeTasks(tomorrowStr, tomorrowStr)),
-    weekCount: (await countAppointments(todayStr, weekEndStr)) + (await countOfficeTasks(todayStr, weekEndStr)),
+    todayCount: await countAppointments(todayStr, todayStr),
+    tomorrowCount: await countAppointments(tomorrowStr, tomorrowStr),
+    weekCount: await countAppointments(todayStr, weekEndStr),
     upcoming,
   });
 });

@@ -7,12 +7,11 @@ import authRoutes from './routes/auth';
 import dentistRoutes from './routes/dentists';
 import patientRoutes from './routes/patients';
 import procedureTypeRoutes from './routes/procedureTypes';
-import taskCategoryRoutes from './routes/taskCategories';
-import officeTaskRoutes from './routes/officeTasks';
 import treatmentPlanRoutes from './routes/treatmentPlans';
 import appointmentRoutes from './routes/appointments';
 import dashboardRoutes from './routes/dashboard';
 import tipsRoutes from './routes/tips';
+import documentRoutes from './routes/documents';
 
 dotenv.config();
 
@@ -29,12 +28,11 @@ async function main() {
   app.use('/api/dentists', dentistRoutes);
   app.use('/api/patients', patientRoutes);
   app.use('/api/procedure-types', procedureTypeRoutes);
-  app.use('/api/task-categories', taskCategoryRoutes);
-  app.use('/api/office-tasks', officeTaskRoutes);
   app.use('/api/treatment-plans', treatmentPlanRoutes);
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/tips', tipsRoutes);
+  app.use('/api/patients', documentRoutes);
 
   const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
   app.listen(PORT, () => {

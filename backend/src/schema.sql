@@ -55,28 +55,6 @@ CREATE TABLE IF NOT EXISTS procedure_types (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS task_categories (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER NOT NULL,
-  name TEXT NOT NULL,
-  color TEXT NOT NULL DEFAULT '#7c8b7a',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS office_tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER NOT NULL,
-  category_id INTEGER NOT NULL REFERENCES task_categories(id),
-  dentist_id INTEGER REFERENCES users(id),
-  title TEXT NOT NULL,
-  description TEXT,
-  date TEXT NOT NULL,
-  start_time TEXT,
-  end_time TEXT,
-  created_by INTEGER NOT NULL REFERENCES users(id),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 CREATE TABLE IF NOT EXISTS treatment_plans (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
@@ -105,4 +83,18 @@ CREATE TABLE IF NOT EXISTS plan_items (
 CREATE TABLE IF NOT EXISTS oral_health_tips (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   text TEXT NOT NULL
+);
+
+-- Cópias assinadas (PDF) enviadas pelo dentista: anamnese, plano de tratamento,
+-- termo de consentimento ou atestado.
+CREATE TABLE IF NOT EXISTS signed_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  plan_id INTEGER REFERENCES treatment_plans(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('ANAMNESIS', 'TREATMENT_PLAN', 'TERMO', 'ATESTADO')),
+  file_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL DEFAULT 'application/pdf',
+  data BLOB NOT NULL,
+  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

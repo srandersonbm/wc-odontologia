@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../../api/client';
-import type { Dentist, ProcedureType, TaskCategory } from '../../api/types';
+import type { Dentist, ProcedureType } from '../../api/types';
 import { Button } from '../../components/ui/Button';
 import { Field, Input } from '../../components/ui/Field';
 import { useAuth } from '../../context/AuthContext';
@@ -16,12 +16,11 @@ export function SettingsPage() {
           Configurações
         </h1>
         <p className="text-sm mt-0.5" style={{ color: 'var(--ink-soft)' }}>
-          Personalize categorias e a equipe do consultório.
+          Personalize procedimentos e a equipe do consultório.
         </p>
       </div>
       <ProfileSection />
       <ProcedureTypesSection />
-      <TaskCategoriesSection />
       <DentistsSection />
     </div>
   );
@@ -117,6 +116,10 @@ function ProcedureTypesSection() {
   const [color, setColor] = useState(swatches[0]);
   const [duration, setDuration] = useState(30);
   const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState(swatches[0]);
+  const [editDuration, setEditDuration] = useState(30);
 
   const load = () => api.get<ProcedureType[]>('/procedure-types').then(setItems);
   useEffect(() => {
@@ -140,6 +143,23 @@ function ProcedureTypesSection() {
     load();
   };
 
+  const startEdit = (p: ProcedureType) => {
+    setEditingId(p.id);
+    setEditName(p.name);
+    setEditColor(p.color);
+    setEditDuration(p.defaultDurationMin);
+  };
+
+  const saveEdit = async (id: number) => {
+    await api.patch(`/procedure-types/${id}`, {
+      name: editName,
+      color: editColor,
+      defaultDurationMin: editDuration,
+    });
+    setEditingId(null);
+    load();
+  };
+
   return (
     <section className="card p-5">
       <h2 className="font-semibold mb-1" style={{ color: 'var(--ink)' }}>
@@ -148,25 +168,72 @@ function ProcedureTypesSection() {
       <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
         Categorias de tratamento próprias, usadas ao montar planos (limpeza, canal, facetas…).
       </p>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {items.map((p) => (
-          <span
-            key={p.id}
-            className="badge"
-            style={{ background: `${p.color}22`, color: p.color }}
-          >
-            ● {p.name} · {p.defaultDurationMin}min
-            <button onClick={() => remove(p.id)} className="ml-1" style={{ color: p.color }}>
-              ×
-            </button>
-          </span>
-        ))}
+      <ul className="flex flex-col divide-y mb-5" style={{ borderColor: 'var(--line-soft)' }}>
+        {items.map((p) =>
+          editingId === p.id ? (
+            <li key={p.id} className="py-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Nome">
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-48" />
+                </Field>
+                <Field label="Duração (min)">
+                  <Input
+                    type="number"
+                    min={5}
+                    step={5}
+                    value={editDuration}
+                    onChange={(e) => setEditDuration(Number(e.target.value))}
+                    className="w-28"
+                  />
+                </Field>
+                <Field label="Cor">
+                  <ColorPicker value={editColor} onChange={setEditColor} />
+                </Field>
+                <Button variant="honey" onClick={() => saveEdit(p.id)}>
+                  Salvar
+                </Button>
+                <Button variant="ghost" onClick={() => setEditingId(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </li>
+          ) : (
+            <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.color }} />
+                <p className="text-sm truncate" style={{ color: 'var(--ink)' }}>
+                  {p.name} <span style={{ color: 'var(--ink-faint)' }}>· {p.defaultDurationMin}min</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => startEdit(p)}
+                  className="text-xs px-2 py-1 rounded-md transition-colors"
+                  style={{ color: 'var(--ink-soft)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--line-soft)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => remove(p.id)}
+                  className="text-xs px-2 py-1 rounded-md transition-colors"
+                  style={{ color: 'var(--danger)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--danger-soft)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  Excluir
+                </button>
+              </div>
+            </li>
+          )
+        )}
         {items.length === 0 && (
-          <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+          <p className="text-sm py-2" style={{ color: 'var(--ink-faint)' }}>
             Nenhum procedimento cadastrado ainda.
           </p>
         )}
-      </div>
+      </ul>
       <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
         <Field label="Nome">
           <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Canal" className="w-48" />
@@ -180,72 +247,6 @@ function ProcedureTypesSection() {
             onChange={(e) => setDuration(Number(e.target.value))}
             className="w-28"
           />
-        </Field>
-        <Field label="Cor">
-          <ColorPicker value={color} onChange={setColor} />
-        </Field>
-        <Button type="submit" variant="honey">
-          Adicionar
-        </Button>
-      </form>
-      {error && (
-        <p className="text-sm mt-2" style={{ color: 'var(--danger)' }}>
-          {error}
-        </p>
-      )}
-    </section>
-  );
-}
-
-function TaskCategoriesSection() {
-  const [items, setItems] = useState<TaskCategory[]>([]);
-  const [name, setName] = useState('');
-  const [color, setColor] = useState(swatches[1]);
-  const [error, setError] = useState('');
-
-  const load = () => api.get<TaskCategory[]>('/task-categories').then(setItems);
-  useEffect(() => {
-    load();
-  }, []);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    try {
-      await api.post('/task-categories', { name, color });
-      setName('');
-      load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erro ao criar categoria.');
-    }
-  };
-
-  const remove = async (id: number) => {
-    await api.delete(`/task-categories/${id}`);
-    load();
-  };
-
-  return (
-    <section className="card p-5">
-      <h2 className="font-semibold mb-1" style={{ color: 'var(--ink)' }}>
-        Categorias de tarefas do consultório
-      </h2>
-      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
-        Compartilhadas por todos: limpeza do espaço, mentorias, marketing, manutenção…
-      </p>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {items.map((c) => (
-          <span key={c.id} className="badge" style={{ background: `${c.color}22`, color: c.color }}>
-            ● {c.name}
-            <button onClick={() => remove(c.id)} className="ml-1" style={{ color: c.color }}>
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-      <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
-        <Field label="Nome">
-          <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Marketing" className="w-48" />
         </Field>
         <Field label="Cor">
           <ColorPicker value={color} onChange={setColor} />

@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs';
 import { db, initDb } from './db';
-import { defaultTaskCategories } from './defaults';
 
 const tips = [
   'Escove os dentes por pelo menos 2 minutos, três vezes ao dia.',
@@ -41,13 +40,6 @@ async function seed() {
       'Clínico Geral',
       '#c9a24b',
     ]);
-    for (const c of defaultTaskCategories) {
-      await db.run('INSERT INTO task_categories (tenant_id, name, color) VALUES (?, ?, ?)', [
-        tenantId,
-        c.name,
-        c.color,
-      ]);
-    }
     console.log(`Seed: dentista de demonstração criado (${demoEmail} / demo1234).`);
   }
 

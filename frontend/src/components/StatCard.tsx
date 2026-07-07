@@ -1,22 +1,29 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 export function StatCard({
   label,
   value,
   hint,
   icon,
+  to,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   icon?: ReactNode;
+  to?: string;
 }) {
+  const navigate = useNavigate();
   return (
     <motion.div
       className="card p-5 flex items-start justify-between"
       whileHover={{ y: -2, boxShadow: 'var(--shadow-md)' }}
       transition={{ duration: 0.15 }}
+      onClick={to ? () => navigate(to) : undefined}
+      role={to ? 'button' : undefined}
+      style={{ cursor: to ? 'pointer' : 'default' }}
     >
       <div>
         <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>

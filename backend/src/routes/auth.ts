@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { db } from '../db';
 import { signToken } from '../utils/jwt';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { defaultTaskCategories } from '../defaults';
 
 const router = Router();
 
@@ -41,14 +40,6 @@ router.post('/register-dentist', async (req, res) => {
     specialty || null,
     color,
   ]);
-  for (const c of defaultTaskCategories) {
-    await db.run('INSERT INTO task_categories (tenant_id, name, color) VALUES (?, ?, ?)', [
-      tenantId,
-      c.name,
-      c.color,
-    ]);
-  }
-
   const token = signToken({ id: tenantId, role: 'DENTIST', name, tenantId });
   res.status(201).json({ token, user: { id: tenantId, role: 'DENTIST', name, email } });
 });

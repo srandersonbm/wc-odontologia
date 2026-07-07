@@ -185,5 +185,8 @@ textarea {
   }
 }
 .animate-in {
-  animation: fade-in-up 0.35s ease both;
+  /* sem fill-mode "both": deixar o transform aplicado após a animação criaria um
+     containing block para os descendentes "position: fixed" (ex: as modais),
+     fazendo-os ficar presos dentro deste container em vez de cobrir a tela toda. */
+  animation: fade-in-up 0.35s ease;
 }

@@ -50,10 +50,10 @@ export function DashboardPage() {
       {data && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Pacientes cadastrados" value={data.patientCount} icon="◍" />
-            <StatCard label="Procedimentos pendentes" value={data.pendingProcedures} icon="◎" />
-            <StatCard label="Hoje" value={data.todayCount} hint="ações e atendimentos" icon="☀" />
-            <StatCard label="Amanhã" value={data.tomorrowCount} hint="ações e atendimentos" icon="→" />
+            <StatCard label="Pacientes cadastrados" value={data.patientCount} icon="◍" to="/patients" />
+            <StatCard label="Procedimentos pendentes" value={data.pendingProcedures} icon="◎" to="/calendar" />
+            <StatCard label="Hoje" value={data.todayCount} hint="atendimentos" icon="☀" to="/calendar" />
+            <StatCard label="Amanhã" value={data.tomorrowCount} hint="atendimentos" icon="→" to="/calendar" />
           </div>
 
           <div className="card p-5">

@@ -65,12 +65,16 @@ async function migrateLegacyShape() {
       DROP TABLE IF EXISTS patients;
     `);
   }
+  // O recurso de "ações do consultório" (categorias de tarefa + agenda interna)
+  // foi removido — o calendário agora mostra só atendimentos de planos.
+  await client.executeMultiple(`
+    DROP TABLE IF EXISTS office_tasks;
+    DROP TABLE IF EXISTS task_categories;
+  `);
 }
 
 async function migrateColumnsAndTenants() {
   await addColumnIfMissing('users', 'tenant_id', 'INTEGER');
-  await addColumnIfMissing('task_categories', 'tenant_id', 'INTEGER NOT NULL DEFAULT 0');
-  await addColumnIfMissing('office_tasks', 'tenant_id', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing('dentists', 'phone', 'TEXT');
   await addColumnIfMissing('dentists', 'address', 'TEXT');
   await addColumnIfMissing('dentists', 'instagram', 'TEXT');
@@ -78,19 +82,6 @@ async function migrateColumnsAndTenants() {
 
   // Cada dentista sem tenant vira dono do próprio consultório.
   await client.execute("UPDATE users SET tenant_id = id WHERE role = 'DENTIST' AND tenant_id IS NULL");
-
-  const firstDentist = await client.execute("SELECT id FROM users WHERE role = 'DENTIST' ORDER BY id LIMIT 1");
-  const fallbackTenant = firstDentist.rows[0]?.id;
-  if (fallbackTenant) {
-    await client.execute({
-      sql: 'UPDATE task_categories SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = 0',
-      args: [fallbackTenant],
-    });
-    await client.execute({
-      sql: 'UPDATE office_tasks SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = 0',
-      args: [fallbackTenant],
-    });
-  }
 }
 
 export async function initDb() {

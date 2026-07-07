@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Field, Input, Select, Textarea } from '../../components/ui/Field';
 import { AnamnesisForm } from '../../components/AnamnesisForm';
+import { SignedDocuments } from '../../components/SignedDocuments';
 import { useAuth } from '../../context/AuthContext';
 import {
   formatCents,
@@ -128,16 +129,17 @@ export function PatientDetailPage() {
           )}
         </div>
         {anamnesis ? (
-          <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>
+          <p className="text-sm mb-3" style={{ color: 'var(--ink-soft)' }}>
             {anamnesis.data.queixaPrincipal || 'Anamnese registrada.'}
           </p>
         ) : (
           anamnesis === null && (
-            <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+            <p className="text-sm mb-3" style={{ color: 'var(--ink-faint)' }}>
               Nenhuma anamnese iniciada para este paciente ainda.
             </p>
           )
         )}
+        <SignedDocuments patientId={patient.id} type="ANAMNESIS" label="Enviar anamnese assinada" />
       </div>
 
       {/* Documentos */}
@@ -145,13 +147,19 @@ export function PatientDetailPage() {
         <h2 className="font-semibold mb-3" style={{ color: 'var(--ink)' }}>
           Documentos
         </h2>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => generateTermoPdf(patient, user)}>
-            Gerar termo de consentimento
-          </Button>
-          <Button variant="ghost" onClick={() => setAtestadoOpen(true)}>
-            Emitir atestado
-          </Button>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Button variant="ghost" onClick={() => generateTermoPdf(patient, user)} className="mb-2">
+              Gerar termo de consentimento
+            </Button>
+            <SignedDocuments patientId={patient.id} type="TERMO" label="Enviar termo assinado" />
+          </div>
+          <div>
+            <Button variant="ghost" onClick={() => setAtestadoOpen(true)} className="mb-2">
+              Emitir atestado
+            </Button>
+            <SignedDocuments patientId={patient.id} type="ATESTADO" label="Enviar atestado assinado" />
+          </div>
         </div>
       </div>
 
@@ -510,6 +518,10 @@ function PlanCard({
       >
         + Adicionar procedimento
       </button>
+
+      <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--line-soft)' }}>
+        <SignedDocuments patientId={patient.id} type="TREATMENT_PLAN" planId={plan.id} label="Enviar plano assinado" />
+      </div>
 
       <AddItemModal
         open={addOpen}
