@@ -4,6 +4,7 @@ import { api, ApiError } from '../../api/client';
 import type { Dentist, ProcedureType, TaskCategory } from '../../api/types';
 import { Button } from '../../components/ui/Button';
 import { Field, Input } from '../../components/ui/Field';
+import { useAuth } from '../../context/AuthContext';
 
 const swatches = ['#c9a24b', '#8a9a86', '#a68a6a', '#6a8a9a', '#9a7a8a', '#b8564a'];
 
@@ -18,6 +19,7 @@ export function SettingsPage() {
           Personalize categorias e a equipe do consultório.
         </p>
       </div>
+      <ProfileSection />
       <ProcedureTypesSection />
       <TaskCategoriesSection />
       <DentistsSection />
@@ -43,6 +45,69 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (v: string)
         />
       ))}
     </div>
+  );
+}
+
+function ProfileSection() {
+  const { user, refresh } = useAuth();
+  const [specialty, setSpecialty] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setSpecialty(user.specialty || '');
+      setPhone(user.phone || '');
+      setAddress(user.address || '');
+      setInstagram(user.instagram || '');
+    }
+  }, [user]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSuccess('');
+    try {
+      await api.patch('/auth/me', { specialty, phone, address, instagram });
+      await refresh();
+      setSuccess('Dados salvos.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="card p-5">
+      <h2 className="font-semibold mb-1" style={{ color: 'var(--ink)' }}>
+        Meu perfil e dados do consultório
+      </h2>
+      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
+        Usados no cabeçalho dos documentos gerados (plano de tratamento, anamnese, termo e atestado).
+      </p>
+      <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-3">
+        <Field label="Especialidade">
+          <Input value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex: Clínico Geral" />
+        </Field>
+        <Field label="Telefone">
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(99) 99999-9999" />
+        </Field>
+        <Field label="Endereço do consultório">
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+        </Field>
+        <Field label="Instagram">
+          <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="usuario" />
+        </Field>
+        <div className="sm:col-span-2 flex items-center gap-3">
+          <Button type="submit" variant="honey" disabled={saving}>
+            {saving ? 'Salvando…' : 'Salvar'}
+          </Button>
+          {success && <span className="text-sm" style={{ color: 'var(--sage)' }}>{success}</span>}
+        </div>
+      </form>
+    </section>
   );
 }
 

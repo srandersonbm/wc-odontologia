@@ -5,10 +5,10 @@ import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-async function withProgress(plan: any) {
+async function withTotals(plan: any) {
   const items = await db.all<any>(
     `SELECT pi.id, pi.title, pi.status, pi.scheduled_date as scheduledDate, pi.start_time as startTime,
-            pi.end_time as endTime, pi.notes, pi.order_index as orderIndex,
+            pi.end_time as endTime, pi.notes, pi.order_index as orderIndex, pi.price_cents as priceCents,
             pt.id as procedureTypeId, pt.name as procedureName, pt.color as procedureColor
      FROM plan_items pi
      LEFT JOIN procedure_types pt ON pt.id = pi.procedure_type_id
@@ -18,11 +18,11 @@ async function withProgress(plan: any) {
   );
   const total = items.length;
   const done = items.filter((i) => i.status === 'DONE').length;
-  const progress = total === 0 ? 0 : Math.round((done / total) * 100);
-  return { ...plan, items, progress, totalItems: total, doneItems: done };
+  const totalCents = items.reduce((sum, i) => sum + (i.priceCents || 0), 0);
+  return { ...plan, items, totalItems: total, doneItems: done, totalCents };
 }
 
-// Dentista: lista planos, opcionalmente filtrados por paciente.
+// Dentista: lista planos do consultório (tenant), opcionalmente filtrados por paciente.
 router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const { patientId } = req.query as Record<string, string | undefined>;
   let query = `
@@ -30,52 +30,36 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
            tp.patient_id as patientId, p.name as patientName,
            tp.dentist_id as dentistId, d.name as dentistName
     FROM treatment_plans tp
-    JOIN users p ON p.id = tp.patient_id
+    JOIN patients p ON p.id = tp.patient_id
     JOIN users d ON d.id = tp.dentist_id
-    WHERE 1=1`;
-  const params: any[] = [];
+    WHERE p.tenant_id = ?`;
+  const params: any[] = [req.user!.tenantId];
   if (patientId) {
     query += ' AND tp.patient_id = ?';
     params.push(patientId);
   }
   query += ' ORDER BY tp.created_at DESC';
   const plans = await db.all<any>(query, params);
-  res.json(await Promise.all(plans.map(withProgress)));
-});
-
-// Paciente: apenas os próprios planos.
-router.get('/me', requireAuth, requireRole('PATIENT'), async (req, res) => {
-  const plans = await db.all<any>(
-    `SELECT tp.id, tp.title, tp.notes, tp.status, tp.created_at as createdAt,
-            tp.dentist_id as dentistId, d.name as dentistName
-     FROM treatment_plans tp
-     JOIN users d ON d.id = tp.dentist_id
-     WHERE tp.patient_id = ?
-     ORDER BY tp.created_at DESC`,
-    [req.user!.id]
-  );
-  res.json(await Promise.all(plans.map(withProgress)));
+  res.json(await Promise.all(plans.map(withTotals)));
 });
 
 function canAccessPlan(req: any, plan: any) {
-  if (!plan) return false;
-  if (req.user.role === 'DENTIST') return true;
-  return plan.patient_id === req.user.id;
+  return !!plan && plan.tenantId === req.user.tenantId;
 }
 
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const plan = await db.get<any>(
     `SELECT tp.id, tp.title, tp.notes, tp.status, tp.created_at as createdAt,
-            tp.patient_id, tp.patient_id as patientId, p.name as patientName,
+            tp.patient_id as patientId, p.name as patientName, p.tenant_id as tenantId,
             tp.dentist_id as dentistId, d.name as dentistName
      FROM treatment_plans tp
-     JOIN users p ON p.id = tp.patient_id
+     JOIN patients p ON p.id = tp.patient_id
      JOIN users d ON d.id = tp.dentist_id
      WHERE tp.id = ?`,
     [req.params.id]
   );
   if (!canAccessPlan(req, plan)) return res.status(404).json({ error: 'Plano não encontrado.' });
-  res.json(await withProgress(plan));
+  res.json(await withTotals(plan));
 });
 
 const createPlanSchema = z.object({
@@ -88,7 +72,10 @@ router.post('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const parsed = createPlanSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
   const { patientId, title, notes } = parsed.data;
-  const patient = await db.get('SELECT user_id FROM patients WHERE user_id = ?', [patientId]);
+  const patient = await db.get('SELECT id FROM patients WHERE id = ? AND tenant_id = ?', [
+    patientId,
+    req.user!.tenantId,
+  ]);
   if (!patient) return res.status(404).json({ error: 'Paciente não encontrado.' });
 
   const info = await db.run(
@@ -107,7 +94,11 @@ const updatePlanSchema = z.object({
 router.patch('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const parsed = updatePlanSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
-  const plan = await db.get('SELECT id FROM treatment_plans WHERE id = ?', [req.params.id]);
+  const plan = await db.get(
+    `SELECT tp.id FROM treatment_plans tp JOIN patients p ON p.id = tp.patient_id
+     WHERE tp.id = ? AND p.tenant_id = ?`,
+    [req.params.id, req.user!.tenantId]
+  );
   if (!plan) return res.status(404).json({ error: 'Plano não encontrado.' });
 
   const fields = parsed.data;
@@ -124,11 +115,12 @@ router.patch('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Itens do plano (procedimentos dentro de um plano) ---
+// --- Itens do plano (procedimentos e valores) ---
 
 const createItemSchema = z.object({
   procedureTypeId: z.number().int().optional(),
   title: z.string().min(2),
+  priceCents: z.number().int().nonnegative().optional(),
   scheduledDate: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
@@ -138,17 +130,21 @@ const createItemSchema = z.object({
 router.post('/:id/items', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const parsed = createItemSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
-  const plan = await db.get('SELECT id FROM treatment_plans WHERE id = ?', [req.params.id]);
+  const plan = await db.get(
+    `SELECT tp.id FROM treatment_plans tp JOIN patients p ON p.id = tp.patient_id
+     WHERE tp.id = ? AND p.tenant_id = ?`,
+    [req.params.id, req.user!.tenantId]
+  );
   if (!plan) return res.status(404).json({ error: 'Plano não encontrado.' });
 
-  const { procedureTypeId, title, scheduledDate, startTime, endTime, notes } = parsed.data;
+  const { procedureTypeId, title, priceCents, scheduledDate, startTime, endTime, notes } = parsed.data;
   const maxOrder = await db.get<any>('SELECT COALESCE(MAX(order_index), -1) as m FROM plan_items WHERE plan_id = ?', [
     req.params.id,
   ]);
   const status = scheduledDate ? 'SCHEDULED' : 'PENDING';
   const info = await db.run(
-    `INSERT INTO plan_items (plan_id, procedure_type_id, title, status, scheduled_date, start_time, end_time, notes, order_index)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO plan_items (plan_id, procedure_type_id, title, status, scheduled_date, start_time, end_time, notes, price_cents, order_index)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       req.params.id,
       procedureTypeId ?? null,
@@ -158,6 +154,7 @@ router.post('/:id/items', requireAuth, requireRole('DENTIST'), async (req, res) 
       startTime || null,
       endTime || null,
       notes || null,
+      priceCents ?? 0,
       maxOrder.m + 1,
     ]
   );
@@ -167,6 +164,7 @@ router.post('/:id/items', requireAuth, requireRole('DENTIST'), async (req, res) 
 const updateItemSchema = z.object({
   title: z.string().min(2).optional(),
   status: z.enum(['PENDING', 'SCHEDULED', 'DONE']).optional(),
+  priceCents: z.number().int().nonnegative().optional(),
   scheduledDate: z.string().nullable().optional(),
   startTime: z.string().nullable().optional(),
   endTime: z.string().nullable().optional(),
@@ -184,6 +182,7 @@ router.patch('/items/:itemId', requireAuth, requireRole('DENTIST'), async (req, 
     scheduledDate: 'scheduled_date',
     startTime: 'start_time',
     endTime: 'end_time',
+    priceCents: 'price_cents',
   };
   const sets: string[] = [];
   const params: any[] = [];

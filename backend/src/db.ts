@@ -33,8 +33,70 @@ export const db = {
   },
 };
 
+async function tableExists(table: string): Promise<boolean> {
+  const res = await client.execute({
+    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+    args: [table],
+  });
+  return res.rows.length > 0;
+}
+
+async function columnExists(table: string, column: string): Promise<boolean> {
+  const res = await client.execute(`PRAGMA table_info(${table})`);
+  return res.rows.some((r: any) => r.name === column);
+}
+
+async function addColumnIfMissing(table: string, column: string, definition: string) {
+  if (!(await columnExists(table, column))) {
+    await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+// Migra bancos criados antes da reestruturação (pacientes com login próprio,
+// sem separação por consultório/tenant). Pacientes/planos antigos são
+// descartados nesse processo — o cadastro de dentistas é preservado.
+async function migrateLegacyShape() {
+  if ((await tableExists('patients')) && (await columnExists('patients', 'user_id'))) {
+    await client.executeMultiple(`
+      DROP TABLE IF EXISTS cancel_notices;
+      DROP TABLE IF EXISTS patient_unavailability;
+      DROP TABLE IF EXISTS plan_items;
+      DROP TABLE IF EXISTS treatment_plans;
+      DROP TABLE IF EXISTS patients;
+    `);
+  }
+}
+
+async function migrateColumnsAndTenants() {
+  await addColumnIfMissing('users', 'tenant_id', 'INTEGER');
+  await addColumnIfMissing('task_categories', 'tenant_id', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('office_tasks', 'tenant_id', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('dentists', 'phone', 'TEXT');
+  await addColumnIfMissing('dentists', 'address', 'TEXT');
+  await addColumnIfMissing('dentists', 'instagram', 'TEXT');
+  await addColumnIfMissing('plan_items', 'price_cents', 'INTEGER NOT NULL DEFAULT 0');
+
+  // Cada dentista sem tenant vira dono do próprio consultório.
+  await client.execute("UPDATE users SET tenant_id = id WHERE role = 'DENTIST' AND tenant_id IS NULL");
+
+  const firstDentist = await client.execute("SELECT id FROM users WHERE role = 'DENTIST' ORDER BY id LIMIT 1");
+  const fallbackTenant = firstDentist.rows[0]?.id;
+  if (fallbackTenant) {
+    await client.execute({
+      sql: 'UPDATE task_categories SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = 0',
+      args: [fallbackTenant],
+    });
+    await client.execute({
+      sql: 'UPDATE office_tasks SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = 0',
+      args: [fallbackTenant],
+    });
+  }
+}
+
 export async function initDb() {
   await client.execute('PRAGMA foreign_keys = ON;');
+  await migrateLegacyShape();
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
   await client.executeMultiple(schema);
+  await migrateColumnsAndTenants();
 }

@@ -10,8 +10,6 @@ import procedureTypeRoutes from './routes/procedureTypes';
 import taskCategoryRoutes from './routes/taskCategories';
 import officeTaskRoutes from './routes/officeTasks';
 import treatmentPlanRoutes from './routes/treatmentPlans';
-import planItemActionRoutes from './routes/planItemActions';
-import unavailabilityRoutes from './routes/unavailability';
 import appointmentRoutes from './routes/appointments';
 import dashboardRoutes from './routes/dashboard';
 import tipsRoutes from './routes/tips';
@@ -34,8 +32,6 @@ async function main() {
   app.use('/api/task-categories', taskCategoryRoutes);
   app.use('/api/office-tasks', officeTaskRoutes);
   app.use('/api/treatment-plans', treatmentPlanRoutes);
-  app.use('/api/plan-items', planItemActionRoutes);
-  app.use('/api/unavailability', unavailabilityRoutes);
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/tips', tipsRoutes);

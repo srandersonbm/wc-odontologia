@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { db, initDb } from './db';
+import { defaultTaskCategories } from './defaults';
 
 const tips = [
   'Escove os dentes por pelo menos 2 minutos, três vezes ao dia.',
@@ -14,14 +15,6 @@ const tips = [
   'Evite roer unhas ou usar os dentes para abrir embalagens.',
 ];
 
-const officeTaskCategories = [
-  { name: 'Limpeza do consultório', color: '#8a9a86' },
-  { name: 'Mentoria com alunos', color: '#a68a6a' },
-  { name: 'Reunião de marketing', color: '#6a8a9a' },
-  { name: 'Manutenção de equipamentos', color: '#9a7a8a' },
-  { name: 'Administrativo', color: '#7c8b7a' },
-];
-
 async function seed() {
   await initDb();
 
@@ -29,14 +22,6 @@ async function seed() {
   if (tipCount === 0) {
     for (const t of tips) await db.run('INSERT INTO oral_health_tips (text) VALUES (?)', [t]);
     console.log(`Seed: ${tips.length} dicas de saúde bucal inseridas.`);
-  }
-
-  const categoryCount = (await db.get<any>('SELECT COUNT(*) as c FROM task_categories')).c;
-  if (categoryCount === 0) {
-    for (const c of officeTaskCategories) {
-      await db.run('INSERT INTO task_categories (name, color) VALUES (?, ?)', [c.name, c.color]);
-    }
-    console.log(`Seed: ${officeTaskCategories.length} categorias de tarefas inseridas.`);
   }
 
   const demoEmail = 'dentista@wcodontologia.com';
@@ -49,11 +34,20 @@ async function seed() {
       demoEmail,
       hash,
     ]);
+    const tenantId = info.lastInsertRowid;
+    await db.run('UPDATE users SET tenant_id = ? WHERE id = ?', [tenantId, tenantId]);
     await db.run('INSERT INTO dentists (user_id, specialty, color) VALUES (?, ?, ?)', [
-      info.lastInsertRowid,
+      tenantId,
       'Clínico Geral',
       '#c9a24b',
     ]);
+    for (const c of defaultTaskCategories) {
+      await db.run('INSERT INTO task_categories (tenant_id, name, color) VALUES (?, ?, ?)', [
+        tenantId,
+        c.name,
+        c.color,
+      ]);
+    }
     console.log(`Seed: dentista de demonstração criado (${demoEmail} / demo1234).`);
   }
 

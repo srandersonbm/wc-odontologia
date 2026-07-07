@@ -2,25 +2,48 @@
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  role TEXT NOT NULL CHECK (role IN ('DENTIST', 'PATIENT')),
+  role TEXT NOT NULL DEFAULT 'DENTIST',
   name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  tenant_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS dentists (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   specialty TEXT,
-  color TEXT NOT NULL DEFAULT '#c9a24b'
+  color TEXT NOT NULL DEFAULT '#c9a24b',
+  phone TEXT,
+  address TEXT,
+  instagram TEXT
 );
 
+-- Pacientes são cadastros do consultório (tenant), sem login no sistema.
 CREATE TABLE IF NOT EXISTS patients (
-  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  created_by_dentist_id INTEGER REFERENCES users(id),
+  name TEXT NOT NULL,
+  email TEXT,
   phone TEXT,
   birth_date TEXT,
-  created_by_dentist_id INTEGER REFERENCES users(id),
+  rg TEXT,
+  cpf TEXT,
+  profession TEXT,
+  marital_status TEXT,
+  address TEXT,
+  city TEXT,
+  state TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS anamnesis (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  patient_id INTEGER NOT NULL UNIQUE REFERENCES patients(id) ON DELETE CASCADE,
+  data TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS procedure_types (
@@ -34,6 +57,7 @@ CREATE TABLE IF NOT EXISTS procedure_types (
 
 CREATE TABLE IF NOT EXISTS task_categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
   name TEXT NOT NULL,
   color TEXT NOT NULL DEFAULT '#7c8b7a',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -41,6 +65,7 @@ CREATE TABLE IF NOT EXISTS task_categories (
 
 CREATE TABLE IF NOT EXISTS office_tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
   category_id INTEGER NOT NULL REFERENCES task_categories(id),
   dentist_id INTEGER REFERENCES users(id),
   title TEXT NOT NULL,
@@ -54,7 +79,7 @@ CREATE TABLE IF NOT EXISTS office_tasks (
 
 CREATE TABLE IF NOT EXISTS treatment_plans (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  patient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
   dentist_id INTEGER NOT NULL REFERENCES users(id),
   title TEXT NOT NULL,
   notes TEXT,
@@ -72,23 +97,8 @@ CREATE TABLE IF NOT EXISTS plan_items (
   start_time TEXT,
   end_time TEXT,
   notes TEXT,
+  price_cents INTEGER NOT NULL DEFAULT 0,
   order_index INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS patient_unavailability (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  patient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  date TEXT NOT NULL,
-  reason TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS cancel_notices (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  plan_item_id INTEGER NOT NULL REFERENCES plan_items(id) ON DELETE CASCADE,
-  patient_id INTEGER NOT NULL REFERENCES users(id),
-  reason TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

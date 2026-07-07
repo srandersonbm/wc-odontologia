@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { api, ApiError } from '../../api/client';
-import type { Appointment, CancelNotice, Dentist, OfficeTask, TaskCategory, Unavailability } from '../../api/types';
+import type { Appointment, Dentist, OfficeTask, TaskCategory } from '../../api/types';
 import { MonthCalendar } from '../../components/calendar/MonthCalendar';
 import type { CalendarEvent } from '../../components/calendar/MonthCalendar';
 import { Button } from '../../components/ui/Button';
@@ -18,8 +18,6 @@ export function CalendarPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [prefillDate, setPrefillDate] = useState<string | undefined>();
-  const [cancelNotices, setCancelNotices] = useState<CancelNotice[]>([]);
-  const [unavailability, setUnavailability] = useState<Unavailability[]>([]);
 
   useEffect(() => {
     api.get<Dentist[]>('/dentists').then(setDentists);
@@ -33,8 +31,6 @@ export function CalendarPage() {
     const dentistQs = dentistId ? `&dentistId=${dentistId}` : '';
     api.get<OfficeTask[]>(`/office-tasks?from=${from}&to=${to}${dentistQs}`).then(setTasks);
     api.get<Appointment[]>(`/appointments?from=${from}&to=${to}${dentistQs}`).then(setAppointments);
-    api.get<Unavailability[]>(`/unavailability?from=${from}&to=${to}`).then(setUnavailability);
-    api.get<CancelNotice[]>('/plan-items/cancel-notices').then(setCancelNotices);
   };
 
   useEffect(() => {
@@ -107,52 +103,6 @@ export function CalendarPage() {
             ● {c.name}
           </span>
         ))}
-      </div>
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <h2 className="font-semibold mb-3" style={{ color: 'var(--ink)' }}>
-            Avisos de indisponibilidade
-          </h2>
-          {cancelNotices.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
-              Nenhum aviso recente.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {cancelNotices.slice(0, 6).map((n) => (
-                <li key={n.id} className="text-sm">
-                  <p style={{ color: 'var(--ink)' }}>
-                    <strong>{n.patientName}</strong> não poderá comparecer em{' '}
-                    <strong>{n.scheduledDate}</strong> ({n.itemTitle})
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
-                    {n.reason}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="card p-5">
-          <h2 className="font-semibold mb-3" style={{ color: 'var(--ink)' }}>
-            Indisponibilidade de pacientes este mês
-          </h2>
-          {unavailability.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
-              Nenhum registro para o período.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {unavailability.map((u) => (
-                <li key={u.id} className="text-sm flex justify-between">
-                  <span style={{ color: 'var(--ink)' }}>{u.patientName}</span>
-                  <span style={{ color: 'var(--ink-faint)' }}>{u.date}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </div>
 
       <NewTaskModal

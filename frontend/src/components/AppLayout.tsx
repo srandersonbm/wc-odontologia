@@ -17,13 +17,6 @@ const dentistNav: NavItem[] = [
   { to: '/settings', label: 'Configurações', icon: '⚙' },
 ];
 
-const patientNav: NavItem[] = [
-  { to: '/portal', label: 'Início', icon: '⌂' },
-  { to: '/portal/calendar', label: 'Meu calendário', icon: '▤' },
-  { to: '/portal/plans', label: 'Meu plano', icon: '◎' },
-  { to: '/portal/availability', label: 'Disponibilidade', icon: '✎' },
-];
-
 function NavLinks({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1">
@@ -60,7 +53,7 @@ export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   if (!user) return null;
-  const items = user.role === 'DENTIST' ? dentistNav : patientNav;
+  const items = dentistNav;
 
   const handleLogout = () => {
     logout();
@@ -84,7 +77,7 @@ export function AppLayout() {
               {user.name}
             </p>
             <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
-              {user.role === 'DENTIST' ? 'Dentista' : 'Paciente'}
+              Dentista
             </p>
           </div>
           <button
@@ -151,7 +144,7 @@ export function AppLayout() {
                     {user.name}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
-                    {user.role === 'DENTIST' ? 'Dentista' : 'Paciente'}
+                    Dentista
                   </p>
                 </div>
                 <button onClick={handleLogout} className="btn btn-ghost w-full justify-start">

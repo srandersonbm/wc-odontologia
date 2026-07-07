@@ -29,7 +29,7 @@ export function PatientsPage() {
   const filtered = patients.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.email.toLowerCase().includes(search.toLowerCase())
+      (p.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -84,7 +84,7 @@ export function PatientsPage() {
                     {p.name}
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
-                    {p.email}
+                    {p.email || 'sem e-mail'}
                     {p.phone ? ` · ${p.phone}` : ''}
                   </p>
                 </div>
@@ -118,7 +118,6 @@ function NewPatientModal({
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -126,7 +125,6 @@ function NewPatientModal({
   const reset = () => {
     setName('');
     setEmail('');
-    setPassword('');
     setPhone('');
     setError('');
   };
@@ -136,7 +134,7 @@ function NewPatientModal({
     setSaving(true);
     setError('');
     try {
-      await api.post('/patients', { name, email, password, phone: phone || undefined });
+      await api.post('/patients', { name, email: email || undefined, phone: phone || undefined });
       reset();
       onCreated();
     } catch (err) {
@@ -152,29 +150,22 @@ function NewPatientModal({
         <Field label="Nome completo">
           <Input required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="E-mail">
-          <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </Field>
-        <Field label="Telefone (opcional)">
+        <Field label="Telefone">
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-0000" />
         </Field>
-        <Field label="Senha de acesso">
-          <Input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Mínimo 6 caracteres"
-          />
+        <Field label="E-mail (opcional)">
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
+        <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+          Dados como RG, CPF e endereço podem ser preenchidos depois, na ficha do paciente.
+        </p>
         {error && (
           <p className="text-sm" style={{ color: 'var(--danger)' }}>
             {error}
           </p>
         )}
         <Button type="submit" variant="honey" disabled={saving} className="mt-1">
-          {saving ? 'Criando…' : 'Criar acesso do paciente'}
+          {saving ? 'Criando…' : 'Criar paciente'}
         </Button>
       </form>
     </Modal>

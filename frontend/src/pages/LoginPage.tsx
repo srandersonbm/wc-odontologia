@@ -21,8 +21,8 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
-      navigate(user.role === 'DENTIST' ? '/dashboard' : '/portal');
+      await login(email, password);
+      navigate('/dashboard');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível entrar.');
     } finally {
@@ -82,9 +82,6 @@ export function LoginPage() {
           <Link to="/registrar" className="font-medium" style={{ color: 'var(--honey-deep)' }}>
             Cadastre seu consultório
           </Link>
-        </p>
-        <p className="text-center text-xs mt-3" style={{ color: 'var(--ink-faint)' }}>
-          Pacientes: peça ao seu dentista para criar seu acesso.
         </p>
       </motion.div>
     </div>

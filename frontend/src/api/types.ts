@@ -1,14 +1,13 @@
-export type Role = 'DENTIST' | 'PATIENT';
-
 export interface AuthUser {
   id: number;
-  role: Role;
+  role: 'DENTIST';
   name: string;
   email: string;
   specialty?: string;
   color?: string;
   phone?: string;
-  birth_date?: string;
+  address?: string;
+  instagram?: string;
 }
 
 export interface Dentist {
@@ -22,9 +21,16 @@ export interface Dentist {
 export interface Patient {
   id: number;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   birthDate?: string;
+  rg?: string;
+  cpf?: string;
+  profession?: string;
+  maritalStatus?: string;
+  address?: string;
+  city?: string;
+  state?: string;
   createdAt: string;
 }
 
@@ -63,6 +69,7 @@ export interface PlanItem {
   startTime?: string | null;
   endTime?: string | null;
   notes?: string | null;
+  priceCents: number;
   orderIndex: number;
   procedureTypeId?: number | null;
   procedureName?: string | null;
@@ -80,9 +87,9 @@ export interface TreatmentPlan {
   dentistId: number;
   dentistName: string;
   items: PlanItem[];
-  progress: number;
   totalItems: number;
   doneItems: number;
+  totalCents: number;
 }
 
 export interface Appointment {
@@ -118,32 +125,45 @@ export interface DashboardData {
   }>;
 }
 
-export interface PatientDashboardData {
-  nextAppointment: {
-    id: number;
-    title: string;
-    date: string;
-    startTime?: string;
-    dentistName: string;
-    procedureName?: string;
-  } | null;
-  activePlanCount: number;
-}
-
-export interface CancelNotice {
+export interface Anamnesis {
   id: number;
-  reason: string;
+  data: AnamnesisData;
   createdAt: string;
-  planItemId: number;
-  itemTitle: string;
-  scheduledDate: string;
-  patientName: string;
+  updatedAt: string;
 }
 
-export interface Unavailability {
-  id: number;
-  date: string;
-  reason?: string;
-  patientName?: string;
-  patientId?: number;
+export interface AnamnesisData {
+  queixaPrincipal?: string;
+  ultimaConsulta?: string;
+  ansiedadeTratamento?: 'sim' | 'nao';
+  escovacaoPorDia?: string;
+  usaFioDental?: 'sim' | 'nao';
+  sangramentoGengival?: 'sim' | 'nao';
+  bruxismo?: 'nao' | 'diurno' | 'noturno';
+  usaProtese?: 'sim' | 'nao';
+  usaProteseQual?: string;
+  jaFezCanal?: 'sim' | 'nao';
+  sobCuidadosMedicos?: 'sim' | 'nao';
+  sobCuidadosMedicosMotivo?: string;
+  tomaMedicamento?: 'sim' | 'nao';
+  tomaMedicamentoQual?: string;
+  condicoes?: string[];
+  outraCondicao?: string;
+  bebidasAlcoolicas?: 'sim' | 'nao';
+  fumante?: 'sim' | 'nao';
+  fumanteQuantos?: string;
+  nauseasFrequentes?: 'sim' | 'nao';
+  salivacaoAbundante?: 'sim' | 'nao';
+  faltaArFrequente?: 'sim' | 'nao';
+  problemasHemorragicos?: 'sim' | 'nao';
+  problemasCicatrizacao?: 'sim' | 'nao';
+  malEstarAnestesico?: 'sim' | 'nao';
+  tornozelosIncham?: 'sim' | 'nao';
+  tornozelosIncham_quando?: string;
+  alergias?: 'sim' | 'nao';
+  alergiasQuais?: string;
+  gravida?: 'sim' | 'nao';
+  gravidaMeses?: string;
+  amamentando?: 'sim' | 'nao';
+  observacoes?: string;
 }

@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Calendário geral do consultório (ações/tarefas internas) — visível somente para dentistas.
+// Calendário geral do consultório (tenant) — visível somente para dentistas.
 // ?dentistId= opcional para filtrar pela agenda de um dentista; omita para ver o consultório todo.
 router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const { from, to, dentistId } = req.query as Record<string, string | undefined>;
@@ -17,8 +17,8 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
     FROM office_tasks t
     JOIN task_categories c ON c.id = t.category_id
     LEFT JOIN users d ON d.id = t.dentist_id
-    WHERE 1=1`;
-  const params: any[] = [];
+    WHERE t.tenant_id = ?`;
+  const params: any[] = [req.user!.tenantId];
   if (from) {
     query += ' AND t.date >= ?';
     params.push(from);
@@ -50,15 +50,25 @@ router.post('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
   const { categoryId, dentistId, title, description, date, startTime, endTime } = parsed.data;
   const info = await db.run(
-    `INSERT INTO office_tasks (category_id, dentist_id, title, description, date, start_time, end_time, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [categoryId, dentistId ?? null, title, description || null, date, startTime || null, endTime || null, req.user!.id]
+    `INSERT INTO office_tasks (tenant_id, category_id, dentist_id, title, description, date, start_time, end_time, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      req.user!.tenantId,
+      categoryId,
+      dentistId ?? null,
+      title,
+      description || null,
+      date,
+      startTime || null,
+      endTime || null,
+      req.user!.id,
+    ]
   );
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
 router.delete('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
-  await db.run('DELETE FROM office_tasks WHERE id = ?', [req.params.id]);
+  await db.run('DELETE FROM office_tasks WHERE id = ? AND tenant_id = ?', [req.params.id, req.user!.tenantId]);
   res.status(204).end();
 });
 
