@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Field, Input, Select, Textarea } from '../../components/ui/Field';
 import { AnamnesisForm } from '../../components/AnamnesisForm';
 import { SignedDocuments } from '../../components/SignedDocuments';
+import { PatientExtraDocuments } from '../../components/PatientExtraDocuments';
 import { useAuth } from '../../context/AuthContext';
 import {
   formatCents,
@@ -189,6 +190,9 @@ export function PatientDetailPage() {
 
       {/* Histórico consolidado — tudo que já foi feito e o que está marcado */}
       <PatientHistorySection plans={plans} onChange={load} />
+
+      {/* Documentação extra — arquivos variados relacionados ao paciente */}
+      <PatientExtraDocuments patientId={patient.id} />
 
       <NewPlanModal
         open={newPlanOpen}

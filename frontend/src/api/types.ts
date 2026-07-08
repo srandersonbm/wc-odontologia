@@ -136,6 +136,14 @@ export interface SignedDocument {
   uploadedAt: string;
 }
 
+export interface PatientDocument {
+  id: number;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  uploadedAt: string;
+}
+
 export interface Anamnesis {
   id: number;
   data: AnamnesisData;

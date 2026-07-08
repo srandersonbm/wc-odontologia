@@ -104,3 +104,16 @@ CREATE TABLE IF NOT EXISTS signed_documents (
   data BLOB NOT NULL,
   uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Documentação extra do paciente: arquivos variados (fotos, exames, laudos etc.)
+-- que o dentista queira anexar à ficha, cada um com um título próprio.
+CREATE TABLE IF NOT EXISTS patient_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  data BLOB NOT NULL,
+  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
