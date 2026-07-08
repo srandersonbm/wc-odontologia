@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { z } from 'zod';
 import { db } from '../db';
 import { signToken } from '../utils/jwt';
 import { requireAuth, requireRole } from '../middleware/auth';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -96,10 +99,18 @@ router.get('/me', requireAuth, async (req, res) => {
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   const dentist = await db.get<any>(
-    'SELECT specialty, color, phone, address, instagram FROM dentists WHERE user_id = ?',
+    `SELECT specialty, color, phone, address, instagram, stamp_name as stampName,
+            cro_number as croNumber, cro_uf as croUf, signature_mime as signatureMime,
+            signature_data as signatureData
+     FROM dentists WHERE user_id = ?`,
     [user.id]
   );
-  res.json({ ...user, ...dentist });
+  const { signatureData, signatureMime, ...dentistRest } = dentist || {};
+  const signatureDataUrl =
+    signatureData && signatureMime
+      ? `data:${signatureMime};base64,${Buffer.from(signatureData).toString('base64')}`
+      : null;
+  res.json({ ...user, ...dentistRest, signatureDataUrl });
 });
 
 const updateProfileSchema = z.object({
@@ -107,9 +118,19 @@ const updateProfileSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   instagram: z.string().optional(),
+  stampName: z.string().optional(),
+  croNumber: z.string().optional(),
+  croUf: z.string().optional(),
 });
 
-// Dados do próprio dentista usados nos cabeçalhos dos documentos gerados (termo, atestado, plano).
+const profileColumnMap: Record<string, string> = {
+  stampName: 'stamp_name',
+  croNumber: 'cro_number',
+  croUf: 'cro_uf',
+};
+
+// Dados do próprio dentista usados nos cabeçalhos e assinatura dos documentos
+// gerados (termo, atestado, plano, anamnese).
 router.patch('/me', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const parsed = updateProfileSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
@@ -117,7 +138,7 @@ router.patch('/me', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const sets: string[] = [];
   const params: any[] = [];
   for (const [key, value] of Object.entries(parsed.data)) {
-    sets.push(`${key} = ?`);
+    sets.push(`${profileColumnMap[key] || key} = ?`);
     params.push(value || null);
   }
   if (sets.length) {
@@ -125,6 +146,26 @@ router.patch('/me', requireAuth, requireRole('DENTIST'), async (req, res) => {
     await db.run(`UPDATE dentists SET ${sets.join(', ')} WHERE user_id = ?`, params);
   }
   res.json({ ok: true });
+});
+
+// Envia a imagem (PNG) da assinatura do dentista logado, usada nos PDFs gerados.
+router.post('/me/signature', requireAuth, requireRole('DENTIST'), upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nenhuma imagem enviada.' });
+  if (req.file.mimetype !== 'image/png') return res.status(400).json({ error: 'Envie uma imagem PNG.' });
+
+  await db.run('UPDATE dentists SET signature_data = ?, signature_mime = ? WHERE user_id = ?', [
+    req.file.buffer,
+    req.file.mimetype,
+    req.user!.id,
+  ]);
+  res.status(201).json({ ok: true });
+});
+
+router.delete('/me/signature', requireAuth, requireRole('DENTIST'), async (req, res) => {
+  await db.run('UPDATE dentists SET signature_data = NULL, signature_mime = NULL WHERE user_id = ?', [
+    req.user!.id,
+  ]);
+  res.status(204).end();
 });
 
 export default router;

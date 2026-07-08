@@ -8,6 +8,10 @@ export interface AuthUser {
   phone?: string;
   address?: string;
   instagram?: string;
+  stampName?: string;
+  croNumber?: string;
+  croUf?: string;
+  signatureDataUrl?: string | null;
 }
 
 export interface Dentist {

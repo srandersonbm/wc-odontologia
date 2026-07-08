@@ -184,6 +184,9 @@ export function PatientDetailPage() {
         </div>
       )}
 
+      {/* Histórico consolidado — tudo que já foi feito e o que está marcado */}
+      <PatientHistorySection plans={plans} />
+
       <NewPlanModal
         open={newPlanOpen}
         patientId={Number(id)}
@@ -221,6 +224,80 @@ export function PatientDetailPage() {
           load();
         }}
       />
+    </div>
+  );
+}
+
+function PatientHistorySection({ plans }: { plans: TreatmentPlan[] }) {
+  const allItems = plans.flatMap((plan) =>
+    plan.items.map((item) => ({ ...item, planTitle: plan.title, dentistName: plan.dentistName }))
+  );
+
+  const done = allItems
+    .filter((i) => i.status === 'DONE')
+    .sort((a, b) => (b.scheduledDate || '').localeCompare(a.scheduledDate || ''));
+
+  const upcoming = allItems
+    .filter((i) => i.status !== 'DONE')
+    .sort((a, b) => (a.scheduledDate || '9999').localeCompare(b.scheduledDate || '9999'));
+
+  if (allItems.length === 0) return null;
+
+  return (
+    <div className="card p-5">
+      <h2 className="font-semibold mb-4" style={{ color: 'var(--ink)' }}>
+        Histórico do paciente
+      </h2>
+      <div className="grid sm:grid-cols-2 gap-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--sage)' }}>
+            Já realizado
+          </p>
+          {done.length === 0 ? (
+            <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+              Nenhum procedimento concluído ainda.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--line-soft)' }}>
+              {done.map((item) => (
+                <li key={item.id} className="py-2">
+                  <p className="text-sm" style={{ color: 'var(--ink)' }}>
+                    {item.title}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+                    {item.scheduledDate || 'sem data'} · {item.planTitle} · {item.dentistName}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--honey-deep)' }}>
+            Marcado para fazer
+          </p>
+          {upcoming.length === 0 ? (
+            <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+              Nenhum procedimento pendente.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--line-soft)' }}>
+              {upcoming.map((item) => (
+                <li key={item.id} className="py-2">
+                  <p className="text-sm" style={{ color: 'var(--ink)' }}>
+                    {item.title}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+                    {item.scheduledDate ? `${item.scheduledDate}${item.startTime ? ` às ${item.startTime}` : ''}` : 'sem data'}
+                    {' · '}
+                    {item.planTitle} · {item.dentistName}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

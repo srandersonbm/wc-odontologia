@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { api, ApiError } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +12,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Field, Input, Select } from '../../components/ui/Field';
 
 export function CalendarPage() {
+  const navigate = useNavigate();
   const [month, setMonth] = useState(new Date());
   const [dentists, setDentists] = useState<Dentist[]>([]);
   const [dentistId, setDentistId] = useState('');
@@ -43,6 +45,18 @@ export function CalendarPage() {
         color: a.procedureColor || '#c9a24b',
         label: `${a.patientName} · ${a.title}`,
         time: a.startTime,
+        patientId: a.patientId,
+        tooltip: {
+          title: a.procedureName || a.title,
+          time:
+            a.startTime && a.endTime
+              ? `${a.startTime} – ${a.endTime}`
+              : a.startTime
+                ? `${a.startTime}`
+                : undefined,
+          patientName: a.patientName || '',
+          dentistName: a.dentistName || '',
+        },
       })),
     [appointments]
   );
@@ -95,6 +109,9 @@ export function CalendarPage() {
           setPrefillDate(dateStr);
           setNewOpen(true);
         }}
+        onEventClick={(ev) => {
+          if (ev.patientId) navigate(`/patients/${ev.patientId}`);
+        }}
       />
 
       {legend.length > 0 && (
@@ -145,6 +162,7 @@ function NewAppointmentModal({
   const [endTime, setEndTime] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const endTimeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open && user) {
@@ -233,10 +251,18 @@ function NewAppointmentModal({
             <Input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
           <Field label="Início">
-            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            <Input
+              type="time"
+              value={startTime}
+              onChange={(e) => {
+                setStartTime(e.target.value);
+                // ao completar o horário, já leva o foco pro campo "Fim"
+                if (e.target.value) endTimeRef.current?.focus();
+              }}
+            />
           </Field>
           <Field label="Fim">
-            <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            <Input ref={endTimeRef} type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
           </Field>
         </div>
         {error && (

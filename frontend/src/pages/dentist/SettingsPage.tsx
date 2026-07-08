@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../../api/client';
 import type { Dentist, ProcedureType } from '../../api/types';
 import { Button } from '../../components/ui/Button';
-import { Field, Input } from '../../components/ui/Field';
+import { Field, Input, Select } from '../../components/ui/Field';
 import { useAuth } from '../../context/AuthContext';
 
 const swatches = ['#c9a24b', '#8a9a86', '#a68a6a', '#6a8a9a', '#9a7a8a', '#b8564a'];
@@ -20,6 +20,7 @@ export function SettingsPage() {
         </p>
       </div>
       <ProfileSection />
+      <StampSignatureSection />
       <ProcedureTypesSection />
       <DentistsSection />
     </div>
@@ -106,6 +107,139 @@ function ProfileSection() {
           {success && <span className="text-sm" style={{ color: 'var(--sage)' }}>{success}</span>}
         </div>
       </form>
+    </section>
+  );
+}
+
+const brazilianStates = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
+  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+];
+
+function StampSignatureSection() {
+  const { user, refresh } = useAuth();
+  const [stampName, setStampName] = useState('');
+  const [croNumber, setCroNumber] = useState('');
+  const [croUf, setCroUf] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      setStampName(user.stampName || user.name || '');
+      setCroNumber(user.croNumber || '');
+      setCroUf(user.croUf || '');
+    }
+  }, [user]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSuccess('');
+    try {
+      await api.patch('/auth/me', { stampName, croNumber, croUf });
+      await refresh();
+      setSuccess('Carimbo salvo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFile = async (file: File) => {
+    if (file.type !== 'image/png') {
+      alert('Envie uma imagem em PNG.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await api.upload('/auth/me/signature', fd);
+      await refresh();
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeSignature = async () => {
+    await api.delete('/auth/me/signature');
+    await refresh();
+  };
+
+  return (
+    <section className="card p-5">
+      <h2 className="font-semibold mb-1" style={{ color: 'var(--ink)' }}>
+        Carimbo e assinatura
+      </h2>
+      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
+        Aparecem na área de assinatura dos documentos gerados (termo e atestado).
+      </p>
+      <form onSubmit={handleSubmit} className="grid sm:grid-cols-3 gap-3 mb-5">
+        <Field label="Nome no carimbo">
+          <Input value={stampName} onChange={(e) => setStampName(e.target.value)} placeholder="Ex: Walter Cruz" />
+        </Field>
+        <Field label="Número do CRO">
+          <Input value={croNumber} onChange={(e) => setCroNumber(e.target.value)} placeholder="Ex: 8974" />
+        </Field>
+        <Field label="UF do CRO">
+          <Select value={croUf} onChange={(e) => setCroUf(e.target.value)}>
+            <option value="">Selecione…</option>
+            {brazilianStates.map((uf) => (
+              <option key={uf} value={uf}>
+                {uf}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <div className="sm:col-span-3 flex items-center gap-3">
+          <Button type="submit" variant="honey" disabled={saving}>
+            {saving ? 'Salvando…' : 'Salvar carimbo'}
+          </Button>
+          {success && <span className="text-sm" style={{ color: 'var(--sage)' }}>{success}</span>}
+        </div>
+      </form>
+
+      <div className="pt-4 border-t" style={{ borderColor: 'var(--line-soft)' }}>
+        <p className="label mb-2">Imagem da assinatura (PNG)</p>
+        {user?.signatureDataUrl ? (
+          <div className="flex items-center gap-4">
+            <img
+              src={user.signatureDataUrl}
+              alt="Assinatura"
+              className="h-16 border rounded-lg px-3"
+              style={{ borderColor: 'var(--line)', background: '#fff' }}
+            />
+            <Button variant="ghost" onClick={() => inputRef.current?.click()} disabled={uploading}>
+              {uploading ? 'Enviando…' : 'Trocar imagem'}
+            </Button>
+            <button
+              type="button"
+              onClick={removeSignature}
+              className="text-sm"
+              style={{ color: 'var(--danger)' }}
+            >
+              Remover
+            </button>
+          </div>
+        ) : (
+          <Button variant="ghost" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            {uploading ? 'Enviando…' : '+ Enviar imagem da assinatura'}
+          </Button>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile(f);
+            e.target.value = '';
+          }}
+        />
+      </div>
     </section>
   );
 }

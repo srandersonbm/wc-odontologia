@@ -78,6 +78,11 @@ async function migrateColumnsAndTenants() {
   await addColumnIfMissing('dentists', 'phone', 'TEXT');
   await addColumnIfMissing('dentists', 'address', 'TEXT');
   await addColumnIfMissing('dentists', 'instagram', 'TEXT');
+  await addColumnIfMissing('dentists', 'stamp_name', 'TEXT');
+  await addColumnIfMissing('dentists', 'cro_number', 'TEXT');
+  await addColumnIfMissing('dentists', 'cro_uf', 'TEXT');
+  await addColumnIfMissing('dentists', 'signature_data', 'BLOB');
+  await addColumnIfMissing('dentists', 'signature_mime', 'TEXT');
   await addColumnIfMissing('plan_items', 'price_cents', 'INTEGER NOT NULL DEFAULT 0');
 
   // Cada dentista sem tenant vira dono do próprio consultório.

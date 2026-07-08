@@ -44,11 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
+  // Após autenticar, busca o perfil completo (/auth/me) em vez de usar a resposta
+  // minimalista do login — ela não traz carimbo, assinatura e demais dados do
+  // consultório usados nos PDFs gerados.
   const login = async (email: string, password: string) => {
     const res = await api.post<{ token: string; user: AuthUser }>('/auth/login', { email, password });
     setToken(res.token);
-    setUser(res.user);
-    return res.user;
+    const me = await api.get<AuthUser>('/auth/me');
+    setUser(me);
+    return me;
   };
 
   const registerDentist = async (data: {
@@ -59,8 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     const res = await api.post<{ token: string; user: AuthUser }>('/auth/register-dentist', data);
     setToken(res.token);
-    setUser(res.user);
-    return res.user;
+    const me = await api.get<AuthUser>('/auth/me');
+    setUser(me);
+    return me;
   };
 
   const logout = () => {

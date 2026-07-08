@@ -51,6 +51,58 @@ function drawSignatureLine(doc: jsPDF, y: number, label: string, x = MARGIN, wid
   return y + 5;
 }
 
+function loadImageSize(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error('Não foi possível carregar a assinatura.'));
+    img.src = dataUrl;
+  });
+}
+
+// Desenha a assinatura do dentista (imagem, se cadastrada) sobre a linha, e o
+// carimbo (nome + CRO) logo abaixo — usado nos documentos assinados pelo dentista.
+async function drawDentistSignatureBlock(
+  doc: jsPDF,
+  dentist: AuthUser,
+  y: number,
+  x = MARGIN,
+  width = CONTENT_WIDTH
+): Promise<number> {
+  if (dentist.signatureDataUrl) {
+    try {
+      const { width: iw, height: ih } = await loadImageSize(dentist.signatureDataUrl);
+      const maxW = Math.min(55, width * 0.7);
+      const maxH = 16;
+      let w = maxW;
+      let h = (ih / iw) * w;
+      if (h > maxH) {
+        h = maxH;
+        w = (iw / ih) * h;
+      }
+      doc.addImage(dentist.signatureDataUrl, 'PNG', x + (width - w) / 2, y - h - 2, w, h);
+    } catch {
+      // segue sem a imagem se ela não puder ser carregada
+    }
+  }
+
+  doc.setDrawColor(60, 55, 50);
+  doc.line(x, y, x + width, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(90, 85, 80);
+  doc.text(dentist.stampName || dentist.name, x + width / 2, y + 5, { align: 'center' });
+
+  if (dentist.croNumber || dentist.croUf) {
+    doc.setFontSize(8);
+    doc.text(`CRO - ${dentist.croNumber || '_____'} - ${dentist.croUf || '__'}`, x + width / 2, y + 9.5, {
+      align: 'center',
+    });
+    return y + 9.5;
+  }
+  return y + 5;
+}
+
 function ensureSpace(doc: jsPDF, y: number, needed: number): number {
   if (y + needed > 280) {
     doc.addPage();
@@ -209,7 +261,7 @@ export function generateAnamnesisPdf(patient: Patient, dentist: AuthUser, data: 
   doc.save(`anamnese-${slug(patient.name)}.pdf`);
 }
 
-export function generateTermoPdf(patient: Patient, dentist: AuthUser) {
+export async function generateTermoPdf(patient: Patient, dentist: AuthUser) {
   const doc = new jsPDF();
   let y = drawHeader(doc, dentist, 'Termo de Consentimento Livre e Esclarecido');
 
@@ -251,7 +303,7 @@ export function generateTermoPdf(patient: Patient, dentist: AuthUser) {
 
   const half = CONTENT_WIDTH / 2 - 5;
   y = ensureSpace(doc, y, 20);
-  drawSignatureLine(doc, y, dentist.name, MARGIN, half);
+  await drawDentistSignatureBlock(doc, dentist, y, MARGIN, half);
   drawSignatureLine(doc, y, 'Paciente', MARGIN + half + 10, half);
 
   doc.save(`termo-consentimento-${slug(patient.name)}.pdf`);
@@ -266,7 +318,7 @@ export interface AtestadoOptions {
   cid: string;
 }
 
-export function generateAtestadoPdf(patient: Patient, dentist: AuthUser, opts: AtestadoOptions) {
+export async function generateAtestadoPdf(patient: Patient, dentist: AuthUser, opts: AtestadoOptions) {
   const doc = new jsPDF();
   let y = drawHeader(doc, dentist, 'Atestado');
 
@@ -297,7 +349,7 @@ export function generateAtestadoPdf(patient: Patient, dentist: AuthUser, opts: A
   doc.text(`Imperatriz-MA, ____ / ____ / ________`, MARGIN, y);
   y += 30;
 
-  drawSignatureLine(doc, y, dentist.name, MARGIN, CONTENT_WIDTH);
+  await drawDentistSignatureBlock(doc, dentist, y, MARGIN, CONTENT_WIDTH);
 
   doc.save(`atestado-${slug(patient.name)}.pdf`);
 }

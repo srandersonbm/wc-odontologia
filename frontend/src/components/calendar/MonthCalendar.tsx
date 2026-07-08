@@ -14,12 +14,21 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 
+export interface CalendarEventTooltip {
+  title: string;
+  time?: string;
+  patientName: string;
+  dentistName: string;
+}
+
 export interface CalendarEvent {
   id: number | string;
   date: string; // aaaa-MM-dd
   color: string;
   label: string;
   time?: string;
+  patientId?: number;
+  tooltip?: CalendarEventTooltip;
 }
 
 export function MonthCalendar({
@@ -121,20 +130,48 @@ export function MonthCalendar({
               >
                 {format(day, 'd')}
               </span>
-              <div className="flex flex-col gap-0.5 overflow-hidden">
+              <div className="flex flex-col gap-0.5">
                 {dayEvents.slice(0, 3).map((ev) => (
-                  <span
-                    key={ev.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventClick?.(ev);
-                    }}
-                    className="text-[10px] leading-tight px-1.5 py-0.5 rounded-md truncate"
-                    style={{ background: `${ev.color}22`, color: ev.color }}
-                    title={ev.label}
-                  >
-                    {ev.time ? `${ev.time} ` : ''}
-                    {ev.label}
+                  <span key={ev.id} className="relative group/event">
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick?.(ev);
+                      }}
+                      className="block text-[10px] leading-tight px-1.5 py-0.5 rounded-md truncate"
+                      style={{
+                        background: `${ev.color}22`,
+                        color: ev.color,
+                        cursor: onEventClick ? 'pointer' : 'default',
+                      }}
+                    >
+                      {ev.time ? `${ev.time} ` : ''}
+                      {ev.label}
+                    </span>
+                    {ev.tooltip && (
+                      <div
+                        className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 z-50 hidden group-hover/event:block"
+                        style={{ width: 190 }}
+                      >
+                        <div
+                          className="rounded-lg px-3 py-2 text-left"
+                          style={{ background: 'var(--ink)', color: '#fdfaf3', boxShadow: 'var(--shadow-lg)' }}
+                        >
+                          <p className="text-xs font-semibold">{ev.tooltip.title}</p>
+                          {ev.tooltip.time && (
+                            <p className="text-[11px] mt-0.5" style={{ color: '#e8e4d8' }}>
+                              🕐 {ev.tooltip.time}
+                            </p>
+                          )}
+                          <p className="text-[11px] mt-0.5" style={{ color: '#e8e4d8' }}>
+                            Paciente: {ev.tooltip.patientName}
+                          </p>
+                          <p className="text-[11px]" style={{ color: '#e8e4d8' }}>
+                            Responsável: {ev.tooltip.dentistName}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </span>
                 ))}
                 {dayEvents.length > 3 && (

@@ -16,7 +16,12 @@ CREATE TABLE IF NOT EXISTS dentists (
   color TEXT NOT NULL DEFAULT '#c9a24b',
   phone TEXT,
   address TEXT,
-  instagram TEXT
+  instagram TEXT,
+  stamp_name TEXT,
+  cro_number TEXT,
+  cro_uf TEXT,
+  signature_data BLOB,
+  signature_mime TEXT
 );
 
 -- Pacientes são cadastros do consultório (tenant), sem login no sistema.
