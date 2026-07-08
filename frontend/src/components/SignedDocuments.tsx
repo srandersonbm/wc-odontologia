@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, downloadFile } from '../api/client';
+import { api } from '../api/client';
 import type { SignedDocument, SignedDocumentType } from '../api/types';
+import { FileViewerModal } from './ui/FileViewerModal';
 
 export function SignedDocuments({
   patientId,
@@ -15,6 +16,7 @@ export function SignedDocuments({
 }) {
   const [docs, setDocs] = useState<SignedDocument[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<SignedDocument | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
@@ -39,8 +41,9 @@ export function SignedDocuments({
       fd.append('file', file);
       fd.append('type', type);
       if (planId) fd.append('planId', String(planId));
-      await api.upload(`/patients/${patientId}/documents`, fd);
+      const res = await api.upload<{ id: number }>(`/patients/${patientId}/documents`, fd);
       load();
+      setViewingDoc({ id: res.id, type, planId: planId ?? null, fileName: file.name, uploadedAt: new Date().toISOString() });
     } finally {
       setUploading(false);
     }
@@ -79,7 +82,7 @@ export function SignedDocuments({
             <li key={d.id} className="flex items-center justify-between gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => downloadFile(`/patients/${patientId}/documents/${d.id}/file`, d.fileName)}
+                onClick={() => setViewingDoc(d)}
                 className="underline truncate text-left"
                 style={{ color: 'var(--honey-deep)' }}
               >
@@ -97,6 +100,15 @@ export function SignedDocuments({
           ))}
         </ul>
       )}
+
+      <FileViewerModal
+        open={!!viewingDoc}
+        onClose={() => setViewingDoc(null)}
+        title={viewingDoc?.fileName || ''}
+        fileUrl={viewingDoc ? `/patients/${patientId}/documents/${viewingDoc.id}/file` : ''}
+        fileName={viewingDoc?.fileName || ''}
+        mimeType="application/pdf"
+      />
     </div>
   );
 }

@@ -68,15 +68,19 @@ export const api = {
   upload: <T>(path: string, formData: FormData) => upload<T>(path, formData),
 };
 
-// O download exige o cabeçalho de autenticação, então não dá pra usar um <a href>
-// simples — buscamos os bytes com fetch autenticado e disparamos o download via blob.
-export async function downloadFile(path: string, fileName: string) {
+// Arquivos exigem o cabeçalho de autenticação, então não dá pra usar um <a href>/<img src>
+// simples — buscamos os bytes com fetch autenticado e trabalhamos com um blob local.
+export async function fetchFileBlob(path: string): Promise<Blob> {
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_URL}/api${path}`, { headers });
-  if (!res.ok) throw new ApiError(res.status, 'Não foi possível baixar o arquivo.');
-  const blob = await res.blob();
+  if (!res.ok) throw new ApiError(res.status, 'Não foi possível carregar o arquivo.');
+  return res.blob();
+}
+
+export async function downloadFile(path: string, fileName: string) {
+  const blob = await fetchFileBlob(path);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

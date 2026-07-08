@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { api, ApiError, downloadFile } from '../api/client';
+import { api, ApiError } from '../api/client';
 import type { PatientDocument } from '../api/types';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
+import { FileViewerModal } from './ui/FileViewerModal';
 import { Field, Input } from './ui/Field';
 
 export function PatientExtraDocuments({ patientId }: { patientId: number }) {
   const [docs, setDocs] = useState<PatientDocument[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<PatientDocument | null>(null);
 
   const load = () => {
     api.get<PatientDocument[]>(`/patients/${patientId}/extra-documents`).then(setDocs);
@@ -48,11 +50,7 @@ export function PatientExtraDocuments({ patientId }: { patientId: number }) {
         <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--line-soft)' }}>
           {docs.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between gap-3 py-2.5">
-              <button
-                type="button"
-                onClick={() => downloadFile(`/patients/${patientId}/extra-documents/${doc.id}/file`, doc.fileName)}
-                className="min-w-0 text-left"
-              >
+              <button type="button" onClick={() => setViewingDoc(doc)} className="min-w-0 text-left">
                 <p className="text-sm truncate" style={{ color: 'var(--ink)' }}>
                   📎 {doc.title}
                 </p>
@@ -78,10 +76,20 @@ export function PatientExtraDocuments({ patientId }: { patientId: number }) {
         open={addOpen}
         patientId={patientId}
         onClose={() => setAddOpen(false)}
-        onCreated={() => {
+        onCreated={(doc) => {
           setAddOpen(false);
           load();
+          setViewingDoc(doc);
         }}
+      />
+
+      <FileViewerModal
+        open={!!viewingDoc}
+        onClose={() => setViewingDoc(null)}
+        title={viewingDoc?.title || ''}
+        fileUrl={viewingDoc ? `/patients/${patientId}/extra-documents/${viewingDoc.id}/file` : ''}
+        fileName={viewingDoc?.fileName || ''}
+        mimeType={viewingDoc?.mimeType}
       />
     </div>
   );
@@ -96,7 +104,7 @@ function AddDocumentModal({
   open: boolean;
   patientId: number;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (doc: PatientDocument) => void;
 }) {
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -121,9 +129,16 @@ function AddDocumentModal({
       const fd = new FormData();
       fd.append('title', title);
       fd.append('file', file);
-      await api.upload(`/patients/${patientId}/extra-documents`, fd);
+      const res = await api.upload<{ id: number }>(`/patients/${patientId}/extra-documents`, fd);
+      const created: PatientDocument = {
+        id: res.id,
+        title,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        uploadedAt: new Date().toISOString(),
+      };
       reset();
-      onCreated();
+      onCreated(created);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao enviar documento.');
     } finally {
