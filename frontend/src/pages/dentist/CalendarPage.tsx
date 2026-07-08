@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { api, ApiError } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import type { Appointment, Dentist, Patient, ProcedureType } from '../../api/types';
+import type { Appointment, Dentist, Patient, PendingItem, ProcedureType } from '../../api/types';
 import { MonthCalendar } from '../../components/calendar/MonthCalendar';
 import type { CalendarEvent } from '../../components/calendar/MonthCalendar';
 import { Button } from '../../components/ui/Button';
@@ -13,12 +13,15 @@ import { Field, Input, Select } from '../../components/ui/Field';
 
 export function CalendarPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [month, setMonth] = useState(new Date());
   const [dentists, setDentists] = useState<Dentist[]>([]);
   const [dentistId, setDentistId] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [newOpen, setNewOpen] = useState(false);
   const [prefillDate, setPrefillDate] = useState<string | undefined>();
+  const pendingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.get<Dentist[]>('/dentists').then(setDentists);
@@ -30,12 +33,22 @@ export function CalendarPage() {
   const load = () => {
     const dentistQs = dentistId ? `&dentistId=${dentistId}` : '';
     api.get<Appointment[]>(`/appointments?from=${from}&to=${to}${dentistQs}`).then(setAppointments);
+    api
+      .get<PendingItem[]>(`/treatment-plans/pending-items${dentistId ? `?dentistId=${dentistId}` : ''}`)
+      .then(setPendingItems);
   };
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, dentistId]);
+
+  useEffect(() => {
+    if (searchParams.get('focus') === 'pending') {
+      pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, pendingItems.length]);
 
   const events: CalendarEvent[] = useMemo(
     () =>
@@ -123,6 +136,62 @@ export function CalendarPage() {
           ))}
         </div>
       )}
+
+      <div ref={pendingRef} className="card p-5 scroll-mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold" style={{ color: 'var(--ink)' }}>
+            Procedimentos pendentes
+          </h2>
+          <span className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+            {pendingItems.length}
+          </span>
+        </div>
+        {pendingItems.length === 0 ? (
+          <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+            Nenhum procedimento pendente no momento.
+          </p>
+        ) : (
+          <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--line-soft)' }}>
+            {pendingItems.map((item) => (
+              <li key={item.id}>
+                <button
+                  onClick={() => navigate(`/patients/${item.patientId}`)}
+                  className="w-full flex items-center justify-between gap-3 py-2.5 text-left transition-colors"
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--line-soft)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: item.procedureColor || '#c9a24b' }}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm truncate" style={{ color: 'var(--ink)' }}>
+                        {item.title} <span style={{ color: 'var(--ink-faint)' }}>· {item.patientName}</span>
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+                        {item.planTitle} · {item.dentistName}
+                        {item.scheduledDate
+                          ? ` · agendado para ${item.scheduledDate}${item.startTime ? ` às ${item.startTime}` : ''}`
+                          : ' · sem data'}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className="badge shrink-0"
+                    style={{
+                      background: item.status === 'SCHEDULED' ? 'var(--honey-soft)' : 'var(--line-soft)',
+                      color: item.status === 'SCHEDULED' ? 'var(--honey-deep)' : 'var(--ink-soft)',
+                    }}
+                  >
+                    {item.status === 'SCHEDULED' ? 'Agendado' : 'Pendente'}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <NewAppointmentModal
         open={newOpen}

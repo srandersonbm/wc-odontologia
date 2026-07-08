@@ -66,6 +66,7 @@ export interface TreatmentPlan {
   notes?: string;
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   createdAt: string;
+  completedAt?: string | null;
   patientId?: number;
   patientName?: string;
   dentistId: number;
@@ -90,6 +91,22 @@ export interface Appointment {
   patientId?: number;
   patientName?: string;
   planId: number;
+}
+
+export interface PendingItem {
+  id: number;
+  title: string;
+  status: 'PENDING' | 'SCHEDULED' | 'DONE';
+  scheduledDate?: string | null;
+  startTime?: string | null;
+  procedureName?: string;
+  procedureColor?: string;
+  planId: number;
+  planTitle: string;
+  dentistId: number;
+  dentistName: string;
+  patientId: number;
+  patientName: string;
 }
 
 export interface DashboardData {

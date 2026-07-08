@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS treatment_plans (
   title TEXT NOT NULL,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'CANCELLED')),
+  completed_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

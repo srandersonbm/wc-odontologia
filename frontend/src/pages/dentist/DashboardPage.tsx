@@ -51,7 +51,12 @@ export function DashboardPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Pacientes cadastrados" value={data.patientCount} icon="◍" to="/patients" />
-            <StatCard label="Procedimentos pendentes" value={data.pendingProcedures} icon="◎" to="/calendar" />
+            <StatCard
+              label="Procedimentos pendentes"
+              value={data.pendingProcedures}
+              icon="◎"
+              to="/calendar?focus=pending"
+            />
             <StatCard label="Hoje" value={data.todayCount} hint="atendimentos" icon="☀" to="/calendar" />
             <StatCard label="Amanhã" value={data.tomorrowCount} hint="atendimentos" icon="→" to="/calendar" />
           </div>

@@ -26,7 +26,7 @@ async function withTotals(plan: any) {
 router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const { patientId } = req.query as Record<string, string | undefined>;
   let query = `
-    SELECT tp.id, tp.title, tp.notes, tp.status, tp.created_at as createdAt,
+    SELECT tp.id, tp.title, tp.notes, tp.status, tp.created_at as createdAt, tp.completed_at as completedAt,
            tp.patient_id as patientId, p.name as patientName,
            tp.dentist_id as dentistId, d.name as dentistName
     FROM treatment_plans tp
@@ -43,13 +43,38 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
   res.json(await Promise.all(plans.map(withTotals)));
 });
 
+// Todos os procedimentos pendentes (não concluídos) de planos ativos do consultório —
+// usado na lista de "procedimentos pendentes" do calendário.
+router.get('/pending-items', requireAuth, requireRole('DENTIST'), async (req, res) => {
+  const { dentistId } = req.query as Record<string, string | undefined>;
+  let query = `
+    SELECT pi.id, pi.title, pi.status, pi.scheduled_date as scheduledDate, pi.start_time as startTime,
+           pt.name as procedureName, pt.color as procedureColor,
+           tp.id as planId, tp.title as planTitle,
+           tp.dentist_id as dentistId, d.name as dentistName,
+           p.id as patientId, p.name as patientName
+    FROM plan_items pi
+    JOIN treatment_plans tp ON tp.id = pi.plan_id
+    JOIN patients p ON p.id = tp.patient_id
+    JOIN users d ON d.id = tp.dentist_id
+    LEFT JOIN procedure_types pt ON pt.id = pi.procedure_type_id
+    WHERE pi.status != 'DONE' AND tp.status = 'ACTIVE' AND p.tenant_id = ?`;
+  const params: any[] = [req.user!.tenantId];
+  if (dentistId) {
+    query += ' AND tp.dentist_id = ?';
+    params.push(dentistId);
+  }
+  query += ' ORDER BY (pi.scheduled_date IS NULL), pi.scheduled_date, pi.start_time';
+  res.json(await db.all(query, params));
+});
+
 function canAccessPlan(req: any, plan: any) {
   return !!plan && plan.tenantId === req.user.tenantId;
 }
 
 router.get('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const plan = await db.get<any>(
-    `SELECT tp.id, tp.title, tp.notes, tp.status, tp.created_at as createdAt,
+    `SELECT tp.id, tp.title, tp.notes, tp.status, tp.created_at as createdAt, tp.completed_at as completedAt,
             tp.patient_id as patientId, p.name as patientName, p.tenant_id as tenantId,
             tp.dentist_id as dentistId, d.name as dentistName
      FROM treatment_plans tp
@@ -89,6 +114,7 @@ const updatePlanSchema = z.object({
   title: z.string().min(2).optional(),
   notes: z.string().optional(),
   status: z.enum(['ACTIVE', 'COMPLETED', 'CANCELLED']).optional(),
+  completedAt: z.string().nullable().optional(),
 });
 
 router.patch('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
@@ -102,17 +128,36 @@ router.patch('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   if (!plan) return res.status(404).json({ error: 'Plano não encontrado.' });
 
   const fields = parsed.data;
+  const columnMap: Record<string, string> = { completedAt: 'completed_at' };
   const sets: string[] = [];
   const params: any[] = [];
   for (const [key, value] of Object.entries(fields)) {
-    sets.push(`${key} = ?`);
+    sets.push(`${columnMap[key] || key} = ?`);
     params.push(value);
+  }
+  // Ao marcar o plano como concluído, registra a data automaticamente (dia em que
+  // foi lançado no sistema), a menos que uma data específica já tenha sido enviada.
+  if (fields.status === 'COMPLETED' && fields.completedAt === undefined) {
+    sets.push("completed_at = COALESCE(completed_at, date('now'))");
+  } else if (fields.status && fields.status !== 'COMPLETED' && fields.completedAt === undefined) {
+    sets.push('completed_at = NULL');
   }
   if (sets.length) {
     params.push(req.params.id);
     await db.run(`UPDATE treatment_plans SET ${sets.join(', ')} WHERE id = ?`, params);
   }
   res.json({ ok: true });
+});
+
+router.delete('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
+  const plan = await db.get(
+    `SELECT tp.id FROM treatment_plans tp JOIN patients p ON p.id = tp.patient_id
+     WHERE tp.id = ? AND p.tenant_id = ?`,
+    [req.params.id, req.user!.tenantId]
+  );
+  if (!plan) return res.status(404).json({ error: 'Plano não encontrado.' });
+  await db.run('DELETE FROM treatment_plans WHERE id = ?', [req.params.id]);
+  res.status(204).end();
 });
 
 // --- Itens do plano (procedimentos e valores) ---
@@ -164,6 +209,7 @@ router.post('/:id/items', requireAuth, requireRole('DENTIST'), async (req, res) 
 const updateItemSchema = z.object({
   title: z.string().min(2).optional(),
   status: z.enum(['PENDING', 'SCHEDULED', 'DONE']).optional(),
+  procedureTypeId: z.number().int().nullable().optional(),
   priceCents: z.number().int().nonnegative().optional(),
   scheduledDate: z.string().nullable().optional(),
   startTime: z.string().nullable().optional(),
@@ -174,7 +220,9 @@ const updateItemSchema = z.object({
 router.patch('/items/:itemId', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const parsed = updateItemSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
-  const item = await db.get('SELECT id FROM plan_items WHERE id = ?', [req.params.itemId]);
+  const item = await db.get<any>('SELECT id, scheduled_date as scheduledDate FROM plan_items WHERE id = ?', [
+    req.params.itemId,
+  ]);
   if (!item) return res.status(404).json({ error: 'Procedimento não encontrado.' });
 
   const fields = parsed.data;
@@ -183,12 +231,18 @@ router.patch('/items/:itemId', requireAuth, requireRole('DENTIST'), async (req, 
     startTime: 'start_time',
     endTime: 'end_time',
     priceCents: 'price_cents',
+    procedureTypeId: 'procedure_type_id',
   };
   const sets: string[] = [];
   const params: any[] = [];
   for (const [key, value] of Object.entries(fields)) {
     sets.push(`${columnMap[key] || key} = ?`);
     params.push(value);
+  }
+  // Ao marcar como concluído sem data ainda definida, registra automaticamente o
+  // dia de hoje (o dia em que foi lançado no sistema) como data de realização.
+  if (fields.status === 'DONE' && fields.scheduledDate === undefined && !item.scheduledDate) {
+    sets.push("scheduled_date = date('now')");
   }
   if (sets.length) {
     params.push(req.params.itemId);

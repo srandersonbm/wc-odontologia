@@ -84,6 +84,7 @@ async function migrateColumnsAndTenants() {
   await addColumnIfMissing('dentists', 'signature_data', 'BLOB');
   await addColumnIfMissing('dentists', 'signature_mime', 'TEXT');
   await addColumnIfMissing('plan_items', 'price_cents', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('treatment_plans', 'completed_at', 'TEXT');
 
   // Cada dentista sem tenant vira dono do próprio consultório.
   await client.execute("UPDATE users SET tenant_id = id WHERE role = 'DENTIST' AND tenant_id IS NULL");

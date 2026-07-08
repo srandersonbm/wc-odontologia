@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { api, ApiError } from '../../api/client';
 import type { Anamnesis, AnamnesisData, Patient, ProcedureType, TreatmentPlan } from '../../api/types';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Field, Input, Select, Textarea } from '../../components/ui/Field';
 import { AnamnesisForm } from '../../components/AnamnesisForm';
 import { SignedDocuments } from '../../components/SignedDocuments';
@@ -185,7 +188,7 @@ export function PatientDetailPage() {
       )}
 
       {/* Histórico consolidado — tudo que já foi feito e o que está marcado */}
-      <PatientHistorySection plans={plans} />
+      <PatientHistorySection plans={plans} onChange={load} />
 
       <NewPlanModal
         open={newPlanOpen}
@@ -228,7 +231,7 @@ export function PatientDetailPage() {
   );
 }
 
-function PatientHistorySection({ plans }: { plans: TreatmentPlan[] }) {
+function PatientHistorySection({ plans, onChange }: { plans: TreatmentPlan[]; onChange: () => void }) {
   const allItems = plans.flatMap((plan) =>
     plan.items.map((item) => ({ ...item, planTitle: plan.title, dentistName: plan.dentistName }))
   );
@@ -241,13 +244,60 @@ function PatientHistorySection({ plans }: { plans: TreatmentPlan[] }) {
     .filter((i) => i.status !== 'DONE')
     .sort((a, b) => (a.scheduledDate || '9999').localeCompare(b.scheduledDate || '9999'));
 
-  if (allItems.length === 0) return null;
+  const completedPlans = plans
+    .filter((p) => p.status === 'COMPLETED')
+    .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+
+  const updateItemDate = async (itemId: number, date: string) => {
+    await api.patch(`/treatment-plans/items/${itemId}`, { scheduledDate: date || null });
+    onChange();
+  };
+
+  const updatePlanCompletedDate = async (planId: number, date: string) => {
+    await api.patch(`/treatment-plans/${planId}`, { completedAt: date || null });
+    onChange();
+  };
+
+  if (allItems.length === 0 && completedPlans.length === 0) return null;
 
   return (
     <div className="card p-5">
       <h2 className="font-semibold mb-4" style={{ color: 'var(--ink)' }}>
         Histórico do paciente
       </h2>
+
+      {completedPlans.length > 0 && (
+        <div className="mb-6 pb-6 border-b" style={{ borderColor: 'var(--line-soft)' }}>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--sage)' }}>
+            Planos concluídos
+          </p>
+          <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--line-soft)' }}>
+            {completedPlans.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm truncate" style={{ color: 'var(--ink)' }}>
+                    {p.title}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+                    Responsável: {p.dentistName}
+                  </p>
+                </div>
+                <label className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: 'var(--ink-faint)' }}>
+                  Concluído em
+                  <input
+                    type="date"
+                    className="input"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', width: 145 }}
+                    value={p.completedAt || ''}
+                    onChange={(e) => updatePlanCompletedDate(p.id, e.target.value)}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid sm:grid-cols-2 gap-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--sage)' }}>
@@ -264,9 +314,19 @@ function PatientHistorySection({ plans }: { plans: TreatmentPlan[] }) {
                   <p className="text-sm" style={{ color: 'var(--ink)' }}>
                     {item.title}
                   </p>
-                  <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
-                    {item.scheduledDate || 'sem data'} · {item.planTitle} · {item.dentistName}
+                  <p className="text-xs mb-1" style={{ color: 'var(--ink-faint)' }}>
+                    {item.planTitle} · {item.dentistName}
                   </p>
+                  <label className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ink-faint)' }}>
+                    Realizado em
+                    <input
+                      type="date"
+                      className="input"
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', width: 145 }}
+                      value={item.scheduledDate || ''}
+                      onChange={(e) => updateItemDate(item.id, e.target.value)}
+                    />
+                  </label>
                 </li>
               ))}
             </ul>
@@ -475,7 +535,9 @@ function PlanCard({
 }) {
   const { user } = useAuth();
   const [addOpen, setAddOpen] = useState(false);
+  const [editItem, setEditItem] = useState<TreatmentPlan['items'][number] | null>(null);
   const [scheduleItem, setScheduleItem] = useState<TreatmentPlan['items'][number] | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const toggleDone = async (itemId: number, status: string) => {
     await api.patch(`/treatment-plans/items/${itemId}`, {
@@ -489,6 +551,23 @@ function PlanCard({
     onChange();
   };
 
+  const deletePlan = async () => {
+    await api.delete(`/treatment-plans/${plan.id}`);
+    setDeleteOpen(false);
+    onChange();
+  };
+
+  const toggleCompleted = async () => {
+    await api.patch(`/treatment-plans/${plan.id}`, {
+      status: plan.status === 'COMPLETED' ? 'ACTIVE' : 'COMPLETED',
+    });
+    onChange();
+  };
+
+  const startDate = format(new Date(`${plan.createdAt.split(' ')[0]}T00:00:00`), "d 'de' MMMM 'de' yyyy", {
+    locale: ptBR,
+  });
+
   return (
     <motion.div layout className="card p-5">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -496,6 +575,9 @@ function PlanCard({
           <h3 className="font-semibold" style={{ color: 'var(--ink)' }}>
             {plan.title}
           </h3>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
+            Iniciado em {startDate}
+          </p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
             Responsável: {plan.dentistName}
             {plan.notes ? ` · ${plan.notes}` : ''}
@@ -566,6 +648,15 @@ function PlanCard({
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button
+                onClick={() => setEditItem(item)}
+                className="text-xs px-2 py-1 rounded-md transition-colors"
+                style={{ color: 'var(--ink-soft)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--line-soft)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                Editar
+              </button>
+              <button
                 onClick={() => setScheduleItem(item)}
                 className="text-xs px-2 py-1 rounded-md transition-colors"
                 style={{ color: 'var(--ink-soft)' }}
@@ -588,13 +679,19 @@ function PlanCard({
         ))}
       </div>
 
-      <button
-        onClick={() => setAddOpen(true)}
-        className="text-sm mt-3 font-medium"
-        style={{ color: 'var(--honey-deep)' }}
-      >
-        + Adicionar procedimento
-      </button>
+      <div className="flex items-center justify-between mt-3">
+        <button onClick={() => setAddOpen(true)} className="text-sm font-medium" style={{ color: 'var(--honey-deep)' }}>
+          + Adicionar procedimento
+        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleCompleted} className="text-xs font-medium" style={{ color: 'var(--sage)' }}>
+            {plan.status === 'COMPLETED' ? 'Reabrir plano' : 'Marcar plano como concluído'}
+          </button>
+          <button onClick={() => setDeleteOpen(true)} className="text-xs font-medium" style={{ color: 'var(--danger)' }}>
+            Excluir plano
+          </button>
+        </div>
+      </div>
 
       <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--line-soft)' }}>
         <SignedDocuments patientId={patient.id} type="TREATMENT_PLAN" planId={plan.id} label="Enviar plano assinado" />
@@ -610,6 +707,15 @@ function PlanCard({
           onChange();
         }}
       />
+      <EditItemModal
+        item={editItem}
+        procedureTypes={procedureTypes}
+        onClose={() => setEditItem(null)}
+        onSaved={() => {
+          setEditItem(null);
+          onChange();
+        }}
+      />
       <ScheduleItemModal
         item={scheduleItem}
         onClose={() => setScheduleItem(null)}
@@ -617,6 +723,15 @@ function PlanCard({
           setScheduleItem(null);
           onChange();
         }}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Excluir plano de tratamento"
+        description={`Tem certeza que quer excluir o plano "${plan.title}"? Os ${plan.totalItems} procedimento(s) dele também serão excluídos. Essa ação não pode ser desfeita.`}
+        confirmLabel="Excluir plano"
+        danger
+        onConfirm={deletePlan}
+        onCancel={() => setDeleteOpen(false)}
       />
     </motion.div>
   );
@@ -753,6 +868,85 @@ function AddItemModal({
         )}
         <Button type="submit" variant="honey" disabled={saving}>
           {saving ? 'Adicionando…' : 'Adicionar'}
+        </Button>
+      </form>
+    </Modal>
+  );
+}
+
+function EditItemModal({
+  item,
+  procedureTypes,
+  onClose,
+  onSaved,
+}: {
+  item: TreatmentPlan['items'][number] | null;
+  procedureTypes: ProcedureType[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [price, setPrice] = useState('');
+  const [procedureTypeId, setProcedureTypeId] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      setTitle(item.title);
+      setPrice(item.priceCents ? (item.priceCents / 100).toFixed(2).replace('.', ',') : '');
+      setProcedureTypeId(item.procedureTypeId ? String(item.procedureTypeId) : '');
+      setError('');
+    }
+  }, [item]);
+
+  if (!item) return null;
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const priceCents = price ? Math.round(Number(price.replace(',', '.')) * 100) : 0;
+      await api.patch(`/treatment-plans/items/${item.id}`, {
+        title,
+        priceCents,
+        procedureTypeId: procedureTypeId ? Number(procedureTypeId) : null,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao salvar procedimento.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={!!item} onClose={onClose} title="Editar procedimento">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="Categoria de procedimento (opcional)">
+          <Select value={procedureTypeId} onChange={(e) => setProcedureTypeId(e.target.value)}>
+            <option value="">Selecione…</option>
+            {procedureTypes.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Descrição">
+          <Input required value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label="Valor (R$)">
+          <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" />
+        </Field>
+        {error && (
+          <p className="text-sm" style={{ color: 'var(--danger)' }}>
+            {error}
+          </p>
+        )}
+        <Button type="submit" variant="honey" disabled={saving}>
+          {saving ? 'Salvando…' : 'Salvar'}
         </Button>
       </form>
     </Modal>
