@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-23.0 -62 46 126" width="90" height="246">
+<g id="dente-43" data-fdi="43" data-kind="canine">
+<path class="raiz" d="M -8.50,0.00 L -4.25,-36.40 L -1.50,-56.00 L 1.50,-56.00 L 4.25,-36.40 L 8.50,0.00 Z" fill="none" stroke="#8A8F98" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+<path class="coroa" d="M -10.00,0.00 C -13.50,2.34 -11.50,9.75 -11.00,14.06 C -10.50,18.37 -8.37,22.29 -7.00,25.84 C -5.63,29.39 -3.97,33.31 -2.80,35.34 C -1.63,37.37 -0.93,38.00 0.00,38.00 C 0.93,38.00 1.63,37.37 2.80,35.34 C 3.97,33.31 5.63,29.39 7.00,25.84 C 8.37,22.29 10.50,18.37 11.00,14.06 C 11.50,9.75 13.50,2.34 10.00,0.00 C 6.50,-2.34 -6.50,-2.34 -10.00,0.00 Z" fill="none" stroke="#8A8F98" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="0" y="52.00" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" fill="#6B7280">43</text>
+</g>
+</svg>

@@ -144,6 +144,31 @@ export interface PatientDocument {
   uploadedAt: string;
 }
 
+export interface ToothNote {
+  id: number;
+  toothFdi: number;
+  note: string;
+  createdAt: string;
+  dentistName?: string;
+}
+
+export type PerioSiteKey = 'mv' | 'v' | 'dv' | 'ml' | 'l' | 'dl';
+
+export interface PerioSite {
+  toothFdi: number;
+  site: PerioSiteKey;
+  probingDepth?: number | null;
+  recession?: number | null;
+  bleeding: boolean;
+  suppuration: boolean;
+}
+
+export interface PerioTooth {
+  toothFdi: number;
+  mobility: number;
+  furcation: number;
+}
+
 export interface Anamnesis {
   id: number;
   data: AnamnesisData;

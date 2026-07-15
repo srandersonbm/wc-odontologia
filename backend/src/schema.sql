@@ -117,3 +117,43 @@ CREATE TABLE IF NOT EXISTS patient_documents (
   data BLOB NOT NULL,
   uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Odontograma: observações por dente (numeração FDI). Um dente pode ter várias
+-- observações; a existência de ao menos uma marca o dente com destaque no gráfico.
+CREATE TABLE IF NOT EXISTS tooth_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  tooth_fdi INTEGER NOT NULL,
+  note TEXT NOT NULL,
+  dentist_id INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Periograma: profundidade de sondagem e sangramento em 3 pontos por face
+-- (mv/v/dv vestibular, ml/l/dl palatina ou lingual) de cada dente.
+CREATE TABLE IF NOT EXISTS perio_sites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  tooth_fdi INTEGER NOT NULL,
+  site TEXT NOT NULL CHECK (site IN ('mv', 'v', 'dv', 'ml', 'l', 'dl')),
+  probing_depth INTEGER,
+  recession INTEGER,
+  bleeding INTEGER NOT NULL DEFAULT 0,
+  suppuration INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (patient_id, tooth_fdi, site)
+);
+
+-- Periograma: mobilidade e grau de furca, um valor por dente (não por face).
+CREATE TABLE IF NOT EXISTS perio_teeth (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  tooth_fdi INTEGER NOT NULL,
+  mobility INTEGER NOT NULL DEFAULT 0,
+  furcation INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (patient_id, tooth_fdi)
+);

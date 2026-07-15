@@ -13,6 +13,8 @@ import { Field, Input, Select, Textarea } from '../../components/ui/Field';
 import { AnamnesisForm } from '../../components/AnamnesisForm';
 import { SignedDocuments } from '../../components/SignedDocuments';
 import { PatientExtraDocuments } from '../../components/PatientExtraDocuments';
+import { Odontograma } from '../../components/Odontograma';
+import { Periograma } from '../../components/Periograma';
 import { useAuth } from '../../context/AuthContext';
 import {
   formatCents,
@@ -145,6 +147,12 @@ export function PatientDetailPage() {
         )}
         <SignedDocuments patientId={patient.id} type="ANAMNESIS" label="Enviar anamnese assinada" />
       </div>
+
+      {/* Odontograma */}
+      <Odontograma patientId={patient.id} />
+
+      {/* Periograma */}
+      <Periograma patientId={patient.id} />
 
       {/* Documentos */}
       <div className="card p-5">

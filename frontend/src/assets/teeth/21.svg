@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-23.0 -62 46 122" width="90" height="238">
+<g id="dente-21" data-fdi="21" data-kind="incisor">
+<path class="raiz" d="M -8.00,0.00 L -4.00,-27.30 L -1.50,-42.00 L 1.50,-42.00 L 4.00,-27.30 L 8.00,0.00 Z" fill="none" stroke="#8A8F98" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+<path class="coroa" d="M -11.00,0.00 C -14.83,1.70 -12.18,6.52 -12.00,10.20 C -11.82,13.88 -10.98,18.47 -9.90,22.10 C -8.82,25.73 -7.15,29.98 -5.50,31.96 C -3.85,33.94 -1.83,34.00 0.00,34.00 C 1.83,34.00 3.85,33.94 5.50,31.96 C 7.15,29.98 8.82,25.73 9.90,22.10 C 10.98,18.47 11.82,13.88 12.00,10.20 C 12.18,6.52 14.83,1.70 11.00,0.00 C 7.17,-1.70 -7.17,-1.70 -11.00,0.00 Z" fill="none" stroke="#8A8F98" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="0" y="48.00" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" fill="#6B7280">21</text>
+</g>
+</svg>

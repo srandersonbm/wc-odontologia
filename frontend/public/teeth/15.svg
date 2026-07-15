@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-23.0 -62 46 119" width="90" height="232">
+<g id="dente-15" data-fdi="15" data-kind="premolar">
+<path class="raiz" d="M -9.00,0.00 L -4.50,-24.70 L -1.50,-38.00 L 1.50,-38.00 L 4.50,-24.70 L 9.00,0.00 Z" fill="none" stroke="#8A8F98" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+<path class="coroa" d="M -13.00,0.00 C -17.50,1.71 -14.32,6.72 -14.00,10.23 C -13.68,13.74 -12.47,17.98 -11.05,21.08 C -9.63,24.18 -7.30,27.18 -5.46,28.83 C -3.62,30.48 -1.82,31.00 0.00,31.00 C 1.82,31.00 3.62,30.48 5.46,28.83 C 7.30,27.18 9.63,24.18 11.05,21.08 C 12.47,17.98 13.68,13.74 14.00,10.23 C 14.32,6.72 17.50,1.71 13.00,0.00 C 8.50,-1.71 -8.50,-1.71 -13.00,0.00 Z" fill="none" stroke="#8A8F98" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="0" y="45.00" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" fill="#6B7280">15</text>
+</g>
+</svg>

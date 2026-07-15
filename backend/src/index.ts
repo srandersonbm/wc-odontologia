@@ -12,6 +12,8 @@ import appointmentRoutes from './routes/appointments';
 import dashboardRoutes from './routes/dashboard';
 import tipsRoutes from './routes/tips';
 import documentRoutes from './routes/documents';
+import odontogramaRoutes from './routes/odontograma';
+import perioRoutes from './routes/perio';
 
 dotenv.config();
 
@@ -33,6 +35,8 @@ async function main() {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/tips', tipsRoutes);
   app.use('/api/patients', documentRoutes);
+  app.use('/api/patients', odontogramaRoutes);
+  app.use('/api/patients', perioRoutes);
 
   const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
   app.listen(PORT, () => {
