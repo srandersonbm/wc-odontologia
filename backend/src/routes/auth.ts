@@ -101,16 +101,18 @@ router.get('/me', requireAuth, async (req, res) => {
   const dentist = await db.get<any>(
     `SELECT specialty, color, phone, address, instagram, stamp_name as stampName,
             cro_number as croNumber, cro_uf as croUf, signature_mime as signatureMime,
-            signature_data as signatureData
+            signature_data as signatureData, logo_mime as logoMime, logo_data as logoData
      FROM dentists WHERE user_id = ?`,
     [user.id]
   );
-  const { signatureData, signatureMime, ...dentistRest } = dentist || {};
+  const { signatureData, signatureMime, logoData, logoMime, ...dentistRest } = dentist || {};
   const signatureDataUrl =
     signatureData && signatureMime
       ? `data:${signatureMime};base64,${Buffer.from(signatureData).toString('base64')}`
       : null;
-  res.json({ ...user, ...dentistRest, signatureDataUrl });
+  const logoDataUrl =
+    logoData && logoMime ? `data:${logoMime};base64,${Buffer.from(logoData).toString('base64')}` : null;
+  res.json({ ...user, ...dentistRest, signatureDataUrl, logoDataUrl });
 });
 
 const updateProfileSchema = z.object({
@@ -121,6 +123,10 @@ const updateProfileSchema = z.object({
   stampName: z.string().optional(),
   croNumber: z.string().optional(),
   croUf: z.string().optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
 });
 
 const profileColumnMap: Record<string, string> = {
@@ -165,6 +171,24 @@ router.delete('/me/signature', requireAuth, requireRole('DENTIST'), async (req, 
   await db.run('UPDATE dentists SET signature_data = NULL, signature_mime = NULL WHERE user_id = ?', [
     req.user!.id,
   ]);
+  res.status(204).end();
+});
+
+// Envia a logo do consultório (PNG), usada no cabeçalho dos documentos gerados.
+router.post('/me/logo', requireAuth, requireRole('DENTIST'), upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nenhuma imagem enviada.' });
+  if (req.file.mimetype !== 'image/png') return res.status(400).json({ error: 'Envie uma imagem PNG.' });
+
+  await db.run('UPDATE dentists SET logo_data = ?, logo_mime = ? WHERE user_id = ?', [
+    req.file.buffer,
+    req.file.mimetype,
+    req.user!.id,
+  ]);
+  res.status(201).json({ ok: true });
+});
+
+router.delete('/me/logo', requireAuth, requireRole('DENTIST'), async (req, res) => {
+  await db.run('UPDATE dentists SET logo_data = NULL, logo_mime = NULL WHERE user_id = ?', [req.user!.id]);
   res.status(204).end();
 });
 

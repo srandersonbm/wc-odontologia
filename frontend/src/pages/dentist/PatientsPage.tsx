@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { api, ApiError } from '../../api/client';
 import type { Patient } from '../../api/types';
 import { Button } from '../../components/ui/Button';
@@ -86,6 +88,12 @@ export function PatientsPage() {
                   <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
                     {p.email || 'sem e-mail'}
                     {p.phone ? ` · ${p.phone}` : ''}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
+                    Cadastrado em{' '}
+                    {format(new Date(`${p.createdAt.split(' ')[0]}T00:00:00`), "d 'de' MMMM 'de' yyyy", {
+                      locale: ptBR,
+                    })}
                   </p>
                 </div>
                 <span style={{ color: 'var(--ink-faint)' }}>→</span>

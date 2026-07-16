@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { api } from '../../api/client';
 import type { DashboardData, Dentist } from '../../api/types';
 import { StatCard } from '../../components/StatCard';
-import { TipsTicker } from '../../components/TipsTicker';
 import { useAuth } from '../../context/AuthContext';
 import { Select } from '../../components/ui/Field';
 import { format } from 'date-fns';
@@ -44,8 +43,6 @@ export function DashboardPage() {
           ))}
         </Select>
       </div>
-
-      <TipsTicker />
 
       {data && (
         <>

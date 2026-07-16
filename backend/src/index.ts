@@ -10,7 +10,6 @@ import procedureTypeRoutes from './routes/procedureTypes';
 import treatmentPlanRoutes from './routes/treatmentPlans';
 import appointmentRoutes from './routes/appointments';
 import dashboardRoutes from './routes/dashboard';
-import tipsRoutes from './routes/tips';
 import documentRoutes from './routes/documents';
 import odontogramaRoutes from './routes/odontograma';
 import perioRoutes from './routes/perio';
@@ -33,7 +32,6 @@ async function main() {
   app.use('/api/treatment-plans', treatmentPlanRoutes);
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/dashboard', dashboardRoutes);
-  app.use('/api/tips', tipsRoutes);
   app.use('/api/patients', documentRoutes);
   app.use('/api/patients', odontogramaRoutes);
   app.use('/api/patients', perioRoutes);

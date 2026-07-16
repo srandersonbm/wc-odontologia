@@ -38,32 +38,52 @@ export function Odontograma({ patientId }: { patientId: number }) {
   }, [patientId]);
 
   const annotated = new Set(notes.map((n) => n.toothFdi));
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="card p-5">
-      <h2 className="font-semibold mb-1" style={{ color: 'var(--ink)' }}>
-        Odontograma
-      </h2>
-      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
-        Clique em um dente para ver ou adicionar observações. Dentes com observações ficam marcados.
-      </p>
-
-      <div className="overflow-x-auto">
-        <div className="flex flex-col gap-8 py-2" style={{ minWidth: 760 }}>
-          <ToothArchRow order={UPPER_ORDER} annotated={annotated} onSelect={setActiveTooth} />
-          <ToothArchRow order={LOWER_ORDER} annotated={annotated} onSelect={setActiveTooth} />
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-3"
+      >
+        <div className="text-left">
+          <h2 className="font-semibold" style={{ color: 'var(--ink)' }}>
+            Odontograma
+          </h2>
+          {!open && (
+            <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
+              {annotated.size > 0 ? `${annotated.size} dente(s) com observação` : 'Nenhuma observação ainda'}
+            </p>
+          )}
         </div>
-      </div>
+        <span style={{ color: 'var(--ink-faint)', transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
 
-      <div className="flex items-center gap-4 mt-2 text-xs" style={{ color: 'var(--ink-faint)' }}>
-        <span className="flex items-center gap-1.5">
-          <span
-            className="inline-block rounded-full"
-            style={{ width: 10, height: 10, background: 'var(--sky)', opacity: 0.55 }}
-          />
-          Com observação
-        </span>
-      </div>
+      {open && (
+        <>
+          <p className="text-sm mt-3 mb-4" style={{ color: 'var(--ink-soft)' }}>
+            Clique em um dente para ver ou adicionar observações. Dentes com observações ficam marcados.
+          </p>
+
+          <div className="overflow-x-auto">
+            <div className="flex flex-col gap-8 py-2" style={{ minWidth: 760 }}>
+              <ToothArchRow order={UPPER_ORDER} annotated={annotated} onSelect={setActiveTooth} />
+              <ToothArchRow order={LOWER_ORDER} annotated={annotated} onSelect={setActiveTooth} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 mt-2 text-xs" style={{ color: 'var(--ink-faint)' }}>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block rounded-full"
+                style={{ width: 10, height: 10, background: 'var(--sky)', opacity: 0.55 }}
+              />
+              Com observação
+            </span>
+          </div>
+        </>
+      )}
 
       <ToothNotesModal
         open={activeTooth !== null}

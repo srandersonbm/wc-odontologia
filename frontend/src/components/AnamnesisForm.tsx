@@ -157,11 +157,7 @@ export function AnamnesisForm({
             ))}
           </div>
         </div>
-        <YesNo
-          label="Usa prótese, aparelho ortodôntico ou implante?"
-          value={data.usaProtese}
-          onChange={(v) => set('usaProtese', v)}
-        />
+        <YesNo label="Usa prótese?" value={data.usaProtese} onChange={(v) => set('usaProtese', v)} />
         {data.usaProtese === 'sim' && (
           <div className="py-2">
             <Field label="Qual">
@@ -169,6 +165,12 @@ export function AnamnesisForm({
             </Field>
           </div>
         )}
+        <YesNo
+          label="Usa aparelho ortodôntico?"
+          value={data.usaAparelhoOrtodontico}
+          onChange={(v) => set('usaAparelhoOrtodontico', v)}
+        />
+        <YesNo label="Usa implante?" value={data.usaImplante} onChange={(v) => set('usaImplante', v)} />
         <YesNo label="Já fez tratamento de canal?" value={data.jaFezCanal} onChange={(v) => set('jaFezCanal', v)} />
       </Section>
 

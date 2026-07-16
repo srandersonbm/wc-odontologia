@@ -20,6 +20,7 @@ export function SettingsPage() {
         </p>
       </div>
       <ProfileSection />
+      <BrandingSection />
       <StampSignatureSection />
       <ProcedureTypesSection />
       <DentistsSection />
@@ -107,6 +108,117 @@ function ProfileSection() {
           {success && <span className="text-sm" style={{ color: 'var(--sage)' }}>{success}</span>}
         </div>
       </form>
+    </section>
+  );
+}
+
+function BrandingSection() {
+  const { user, refresh } = useAuth();
+  const [color, setColor] = useState(swatches[0]);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user) setColor(user.color || swatches[0]);
+  }, [user]);
+
+  const saveColor = async (value: string) => {
+    setColor(value);
+    setSaving(true);
+    setSuccess('');
+    try {
+      await api.patch('/auth/me', { color: value });
+      await refresh();
+      setSuccess('Cor salva.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFile = async (file: File) => {
+    if (file.type !== 'image/png') {
+      alert('Envie uma imagem em PNG.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await api.upload('/auth/me/logo', fd);
+      await refresh();
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeLogo = async () => {
+    await api.delete('/auth/me/logo');
+    await refresh();
+  };
+
+  return (
+    <section className="card p-5">
+      <h2 className="font-semibold mb-1" style={{ color: 'var(--ink)' }}>
+        Identidade visual dos documentos
+      </h2>
+      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
+        A logo e a cor aparecem no cabeçalho dos documentos gerados (plano de tratamento, anamnese, termo e
+        atestado).
+      </p>
+
+      <div className="mb-5">
+        <p className="label mb-2">Logo do consultório (PNG)</p>
+        {user?.logoDataUrl ? (
+          <div className="flex items-center gap-4">
+            <img
+              src={user.logoDataUrl}
+              alt="Logo"
+              className="h-16 border rounded-lg px-3"
+              style={{ borderColor: 'var(--line)', background: '#fff' }}
+            />
+            <Button variant="ghost" onClick={() => inputRef.current?.click()} disabled={uploading}>
+              {uploading ? 'Enviando…' : 'Trocar imagem'}
+            </Button>
+            <button type="button" onClick={removeLogo} className="text-sm" style={{ color: 'var(--danger)' }}>
+              Remover
+            </button>
+          </div>
+        ) : (
+          <Button variant="ghost" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            {uploading ? 'Enviando…' : '+ Enviar logo'}
+          </Button>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile(f);
+            e.target.value = '';
+          }}
+        />
+      </div>
+
+      <div className="pt-4 border-t" style={{ borderColor: 'var(--line-soft)' }}>
+        <p className="label mb-2">Cor de destaque</p>
+        <div className="flex items-center gap-3">
+          <ColorPicker value={color} onChange={saveColor} />
+          {saving && (
+            <span className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+              Salvando…
+            </span>
+          )}
+          {!saving && success && (
+            <span className="text-xs" style={{ color: 'var(--sage)' }}>
+              {success}
+            </span>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

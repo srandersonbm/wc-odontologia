@@ -5,40 +5,125 @@ import type { AnamnesisData, AuthUser, Patient, TreatmentPlan } from '../api/typ
 const PAGE_WIDTH = 210;
 const MARGIN = 18;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+const BAR_HEIGHT = 6; // mm — faixa colorida do timbrado (~25px)
 
 export function formatCents(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function drawHeader(doc: jsPDF, dentist: AuthUser, title: string): number {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(30, 28, 24);
-  doc.text('WC Odontologia', MARGIN, 20);
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  const n = parseInt(full, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(110, 100, 90);
-  doc.text(`${dentist.name}${dentist.specialty ? ' · ' + dentist.specialty : ''}`, MARGIN, 26);
-
-  const contactLines: string[] = [];
-  if (dentist.phone) contactLines.push(dentist.phone);
-  if (dentist.instagram) contactLines.push(`@${dentist.instagram.replace(/^@/, '')}`);
-  if (dentist.address) contactLines.push(dentist.address);
-  doc.setFontSize(9);
-  contactLines.forEach((line, i) => {
-    doc.text(line, PAGE_WIDTH - MARGIN, 16 + i * 4.5, { align: 'right' });
+function loadImageSize(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error('Não foi possível carregar a imagem.'));
+    img.src = dataUrl;
   });
+}
 
-  doc.setDrawColor(220, 210, 190);
-  doc.line(MARGIN, 31, PAGE_WIDTH - MARGIN, 31);
+// Timbrado: logo centralizada (se houver), nome do dentista, faixa colorida
+// (cor escolhida em Configurações) e o título do documento.
+async function drawLetterhead(doc: jsPDF, dentist: AuthUser, title: string): Promise<number> {
+  let y = 14;
+
+  if (dentist.logoDataUrl) {
+    try {
+      const { width, height } = await loadImageSize(dentist.logoDataUrl);
+      const maxH = 16;
+      let h = maxH;
+      let w = (width / height) * h;
+      if (w > 60) {
+        w = 60;
+        h = (height / width) * w;
+      }
+      doc.addImage(dentist.logoDataUrl, 'PNG', (PAGE_WIDTH - w) / 2, y, w, h);
+      y += h + 4;
+    } catch {
+      // segue sem a logo se ela não puder ser carregada
+    }
+  }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
+  doc.setFontSize(14);
   doc.setTextColor(30, 28, 24);
-  doc.text(title, PAGE_WIDTH / 2, 42, { align: 'center' });
+  doc.text(dentist.name, PAGE_WIDTH / 2, y + 5, { align: 'center' });
+  y += 9;
 
-  return 50;
+  const subLines: string[] = [];
+  if (dentist.specialty) subLines.push(dentist.specialty);
+  const contact = [dentist.phone, dentist.instagram ? `@${dentist.instagram.replace(/^@/, '')}` : '', dentist.address]
+    .filter(Boolean)
+    .join(' · ');
+  if (contact) subLines.push(contact);
+  if (subLines.length) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(110, 100, 90);
+    subLines.forEach((line, i) => {
+      doc.text(line, PAGE_WIDTH / 2, y + 3 + i * 4, { align: 'center' });
+    });
+    y += 3 + subLines.length * 4;
+  }
+
+  y += 5;
+  const [r, g, b] = hexToRgb(dentist.color || '#c9a24b');
+  doc.setFillColor(r, g, b);
+  doc.rect(0, y, PAGE_WIDTH, BAR_HEIGHT, 'F');
+  y += BAR_HEIGHT + 10;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(30, 28, 24);
+  doc.text(title, PAGE_WIDTH / 2, y, { align: 'center' });
+
+  return y + 10;
+}
+
+// Bloco com os dados do paciente que o sistema já possui — sempre incluído
+// automaticamente, não faz parte do texto editável do documento.
+function drawPatientInfoBlock(doc: jsPDF, y: number, patient: Patient): number {
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    theme: 'plain',
+    styles: { fontSize: 9, cellPadding: 1.2, textColor: [40, 38, 34] },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 30 },
+      2: { fontStyle: 'bold', cellWidth: 30 },
+    },
+    body: [
+      ['Paciente', patient.name, 'Data de nasc.', patient.birthDate || '—'],
+      ['CPF', patient.cpf || '—', 'RG', patient.rg || '—'],
+      ['Telefone', patient.phone || '—', 'Profissão', patient.profession || '—'],
+      ['Endereço', patient.address || '—', 'Cidade/UF', patient.city ? `${patient.city}/${patient.state || '—'}` : '—'],
+    ],
+  });
+  return (doc as any).lastAutoTable.finalY + 6;
+}
+
+// Texto do documento (já editado pelo usuário) — parágrafos separados por
+// linha em branco, cada um quebrado automaticamente na largura da página.
+function drawBodyText(doc: jsPDF, y: number, text: string): number {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.setTextColor(40, 38, 34);
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  for (const p of paragraphs) {
+    const lines = doc.splitTextToSize(p, CONTENT_WIDTH);
+    y = ensureSpace(doc, y, lines.length * 5 + 5);
+    doc.text(lines, MARGIN, y);
+    y += lines.length * 5 + 5;
+  }
+  return y;
 }
 
 function drawSignatureLine(doc: jsPDF, y: number, label: string, x = MARGIN, width = CONTENT_WIDTH): number {
@@ -49,15 +134,6 @@ function drawSignatureLine(doc: jsPDF, y: number, label: string, x = MARGIN, wid
   doc.setTextColor(90, 85, 80);
   doc.text(label, x + width / 2, y + 5, { align: 'center' });
   return y + 5;
-}
-
-function loadImageSize(dataUrl: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => reject(new Error('Não foi possível carregar a assinatura.'));
-    img.src = dataUrl;
-  });
 }
 
 // Desenha a assinatura do dentista (imagem, se cadastrada) sobre a linha, e o
@@ -111,57 +187,43 @@ function ensureSpace(doc: jsPDF, y: number, needed: number): number {
   return y;
 }
 
-export function generateTreatmentPlanPdf(patient: Patient, dentist: AuthUser, plan: TreatmentPlan) {
+// --- Plano de tratamento ---------------------------------------------------
+
+export function buildTreatmentPlanText(plan: TreatmentPlan): string {
+  const items =
+    plan.items.map((item, i) => `${i + 1}. ${item.title} — ${formatCents(item.priceCents)}`).join('\n') ||
+    'Nenhum procedimento incluído neste plano.';
+  return [
+    `Plano: ${plan.title}`,
+    items,
+    `Total: ${formatCents(plan.totalCents)}`,
+    plan.notes ? `Observações: ${plan.notes}` : '',
+    'IMPORTANTE: os tratamentos serão iniciados mediante o pagamento de 50% (ou o que for combinado) e concluídos quando totalmente pagos.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+export async function generateTreatmentPlanPdf(patient: Patient, dentist: AuthUser, plan: TreatmentPlan, bodyText: string) {
   const doc = new jsPDF();
-  let y = drawHeader(doc, dentist, 'Plano de Tratamento Odontológico');
+  let y = await drawLetterhead(doc, dentist, 'Plano de Tratamento Odontológico');
+  y = drawPatientInfoBlock(doc, y, patient);
+  y = drawBodyText(doc, y, bodyText);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(40, 38, 34);
-  doc.text(`Paciente: ${patient.name}`, MARGIN, y);
-  doc.text(`Telefone: ${patient.phone || '—'}`, PAGE_WIDTH - MARGIN, y, { align: 'right' });
-  y += 10;
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    head: [['Tratamento a ser realizado', 'Valor']],
-    body: plan.items.map((item) => [item.title, formatCents(item.priceCents)]),
-    foot: [['Total', formatCents(plan.totalCents)]],
-    headStyles: { fillColor: [42, 60, 66], textColor: 255 },
-    footStyles: { fillColor: [243, 230, 196], textColor: [40, 34, 5], fontStyle: 'bold' },
-    columnStyles: { 1: { halign: 'right', cellWidth: 40 } },
-    styles: { fontSize: 10, cellPadding: 3 },
-  });
-
-  y = (doc as any).lastAutoTable.finalY + 14;
-  y = ensureSpace(doc, y, 40);
-
-  doc.setFillColor(243, 230, 196);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 26, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(80, 60, 10);
-  doc.text('IMPORTANTE:', MARGIN + 4, y + 7);
-  doc.setFont('helvetica', 'normal');
-  const importantText = doc.splitTextToSize(
-    'Os tratamentos serão iniciados mediante o pagamento de 50% (ou o que for combinado) e concluídos quando totalmente pagos.',
-    CONTENT_WIDTH - 8
-  );
-  doc.text(importantText, MARGIN + 4, y + 13);
-
-  y += 36;
-  y = ensureSpace(doc, y, 60);
+  y += 6;
+  y = ensureSpace(doc, y, 30);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(40, 38, 34);
   doc.text('Data: ____ / ____ / ________', MARGIN, y);
   y += 20;
 
-  y = drawSignatureLine(doc, y, 'Assinatura do paciente ou responsável', MARGIN, CONTENT_WIDTH);
+  drawSignatureLine(doc, y, 'Assinatura do paciente ou responsável', MARGIN, CONTENT_WIDTH);
 
   doc.save(`plano-de-tratamento-${slug(patient.name)}.pdf`);
 }
+
+// --- Anamnese ----------------------------------------------------------------
 
 const anamnesisFields: Array<{ key: keyof AnamnesisData; label: string }> = [
   { key: 'queixaPrincipal', label: 'Queixa principal / motivo da consulta' },
@@ -171,8 +233,10 @@ const anamnesisFields: Array<{ key: keyof AnamnesisData; label: string }> = [
   { key: 'usaFioDental', label: 'Usa fio dental' },
   { key: 'sangramentoGengival', label: 'Sangramento na gengiva ao escovar' },
   { key: 'bruxismo', label: 'Range ou aperta os dentes (bruxismo)' },
-  { key: 'usaProtese', label: 'Usa prótese, aparelho ou implante' },
+  { key: 'usaProtese', label: 'Usa prótese' },
   { key: 'usaProteseQual', label: 'Qual' },
+  { key: 'usaAparelhoOrtodontico', label: 'Usa aparelho ortodôntico' },
+  { key: 'usaImplante', label: 'Usa implante' },
   { key: 'jaFezCanal', label: 'Já fez tratamento de canal' },
   { key: 'sobCuidadosMedicos', label: 'Está ou esteve sob cuidados médicos' },
   { key: 'sobCuidadosMedicosMotivo', label: 'Por quê' },
@@ -198,62 +262,36 @@ const anamnesisFields: Array<{ key: keyof AnamnesisData; label: string }> = [
 
 const yesNoLabel: Record<string, string> = { sim: 'Sim', nao: 'Não', diurno: 'Diurno', noturno: 'Noturno' };
 
-export function generateAnamnesisPdf(patient: Patient, dentist: AuthUser, data: AnamnesisData) {
-  const doc = new jsPDF();
-  let y = drawHeader(doc, dentist, 'Ficha de Anamnese Odontológica');
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    body: [
-      ['Nome', patient.name, 'Data de nascimento', patient.birthDate || '—'],
-      ['Profissão', patient.profession || '—', 'Estado civil', patient.maritalStatus || '—'],
-      ['Cidade', patient.city || '—', 'Telefone', patient.phone || '—'],
-    ],
-    theme: 'plain',
-    styles: { fontSize: 9.5, cellPadding: 1.5 },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 28 },
-      2: { fontStyle: 'bold', cellWidth: 32 },
-    },
-  });
-  y = (doc as any).lastAutoTable.finalY + 6;
-
+export function buildAnamnesisText(data: AnamnesisData): string {
   const condicoes = (data.condicoes || []).join(', ');
-  const rows = anamnesisFields
+  const lines = anamnesisFields
     .map((f) => {
       const raw = data[f.key];
       if (raw === undefined || raw === null || raw === '') return null;
       const value = typeof raw === 'string' && yesNoLabel[raw] ? yesNoLabel[raw] : String(raw);
-      return [f.label, value];
+      return `${f.label}: ${value}`;
     })
-    .filter((r): r is string[] => r !== null);
+    .filter((l): l is string => l !== null);
 
-  if (condicoes) rows.splice(9, 0, ['Já foi acometido de alguma doença', condicoes]);
+  if (condicoes) lines.splice(9, 0, `Já foi acometido de alguma doença: ${condicoes}`);
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    head: [['Pergunta', 'Resposta']],
-    body: rows,
-    headStyles: { fillColor: [42, 60, 66], textColor: 255 },
-    styles: { fontSize: 9, cellPadding: 2.5 },
-    columnStyles: { 0: { cellWidth: 100 } },
-  });
-
-  y = (doc as any).lastAutoTable.finalY + 16;
-  y = ensureSpace(doc, y, 40);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(70, 65, 60);
-  const declaration = doc.splitTextToSize(
+  return [
+    lines.join('\n'),
     'Declaro que as informações acima prestadas são verdadeiras e que fui devidamente esclarecido(a) sobre o planejamento e os procedimentos odontológicos a serem realizados em meu caso.',
-    CONTENT_WIDTH
-  );
-  doc.text(declaration, MARGIN, y);
-  y += declaration.length * 4.5 + 12;
+  ].join('\n\n');
+}
 
+export async function generateAnamnesisPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
+  const doc = new jsPDF();
+  let y = await drawLetterhead(doc, dentist, 'Ficha de Anamnese Odontológica');
+  y = drawPatientInfoBlock(doc, y, patient);
+  y = drawBodyText(doc, y, bodyText);
+
+  y += 6;
+  y = ensureSpace(doc, y, 30);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(40, 38, 34);
   doc.text('Data: ____ / ____ / ________', MARGIN, y);
   y += 16;
   drawSignatureLine(doc, y, 'Nome por extenso e assinatura (paciente ou responsável)', MARGIN, CONTENT_WIDTH);
@@ -261,14 +299,9 @@ export function generateAnamnesisPdf(patient: Patient, dentist: AuthUser, data: 
   doc.save(`anamnese-${slug(patient.name)}.pdf`);
 }
 
-export async function generateTermoPdf(patient: Patient, dentist: AuthUser) {
-  const doc = new jsPDF();
-  let y = drawHeader(doc, dentist, 'Termo de Consentimento Livre e Esclarecido');
+// --- Termo de consentimento --------------------------------------------------
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(40, 38, 34);
-
+export function buildTermoText(patient: Patient, dentist: AuthUser): string {
   const intro =
     `O presente documento é firmado entre o(a) cirurgião-dentista ${dentist.name} e o(a) Sr.(a) ` +
     `${patient.name}, profissão ${patient.profession || '_______________'}, portador(a) do RG ${
@@ -277,7 +310,7 @@ export async function generateTermoPdf(patient: Patient, dentist: AuthUser) {
       patient.address || '_______________'
     }, na cidade de ${patient.city || '_____________'}, estado de ${patient.state || '___'}.`;
 
-  const paragraphs = [
+  return [
     intro,
     'Neste documento, o(a) paciente acima citado(a) declara que todas as informações por ele(a) prestadas são verdadeiras e que está consciente e devidamente informado(a). O paciente concorda que seja providenciada a ficha clínica com seus dados pessoais e informações pertinentes, exames clínicos e laboratoriais, radiografias e fotografias, diagnósticos e plano de tratamento.',
     'Também se declara ciente e concorda que o(a) cirurgião-dentista utilize informações e dados referentes ao seu caso — mantida a privacidade pessoal — para fins de estudo, aprendizado e publicação em redes sociais, livros, revistas ou outras atividades científicas, respeitando a legislação vigente.',
@@ -287,17 +320,20 @@ export async function generateTermoPdf(patient: Patient, dentist: AuthUser) {
     'É de meu conhecimento que devo informar ao(à) profissional qualquer alteração decorrente do tratamento, insatisfações ou dúvidas, mantendo meus dados cadastrais atualizados. Estou ciente de que o(a) cirurgião-dentista utilizará técnicas e materiais com efetiva comprovação científica, adequados ao meu caso.',
     'Estou ciente de que os resultados esperados podem não se concretizar em face da resposta biológica do meu organismo e de minha colaboração, sendo certo que o(a) profissional se compromete a utilizar as técnicas adequadas, assumindo responsabilidade pelos serviços prestados e resguardando minha privacidade e sigilo profissional.',
     'Declaro estar ciente do plano de tratamento odontológico em anexo, bem como de possíveis alterações que venham a ocorrer, e concordo com a possibilidade, se necessária, de extrações parciais ou totais de dentes, que somente serão realizadas após meu consentimento expresso.',
-  ];
+  ].join('\n\n');
+}
 
-  for (const p of paragraphs) {
-    const lines = doc.splitTextToSize(p, CONTENT_WIDTH);
-    y = ensureSpace(doc, y, lines.length * 4.6 + 6);
-    doc.text(lines, MARGIN, y);
-    y += lines.length * 4.6 + 6;
-  }
+export async function generateTermoPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
+  const doc = new jsPDF();
+  let y = await drawLetterhead(doc, dentist, 'Termo de Consentimento Livre e Esclarecido');
+  y = drawPatientInfoBlock(doc, y, patient);
+  y = drawBodyText(doc, y, bodyText);
 
   y = ensureSpace(doc, y, 40);
   y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(40, 38, 34);
   doc.text('Imperatriz/MA, ____ / ____ / ________', MARGIN, y);
   y += 20;
 
@@ -309,6 +345,8 @@ export async function generateTermoPdf(patient: Patient, dentist: AuthUser) {
   doc.save(`termo-consentimento-${slug(patient.name)}.pdf`);
 }
 
+// --- Atestado ------------------------------------------------------------------
+
 export interface AtestadoOptions {
   finalidade: string;
   date: string;
@@ -318,36 +356,32 @@ export interface AtestadoOptions {
   cid: string;
 }
 
-export async function generateAtestadoPdf(patient: Patient, dentist: AuthUser, opts: AtestadoOptions) {
-  const doc = new jsPDF();
-  let y = drawHeader(doc, dentist, 'Atestado');
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(40, 38, 34);
-
-  const lines = [
-    `Atesto para fins ${opts.finalidade || '_______________________'} que ${patient.name},`,
-    `portador(a) do RG nº ${patient.rg || '_______________'}, residente e domiciliado(a) à ${
+export function buildAtestadoText(patient: Patient, opts: AtestadoOptions): string {
+  return [
+    `Atesto para fins ${opts.finalidade || '_______________________'} que ${patient.name}, portador(a) do RG nº ${
+      patient.rg || '_______________'
+    }, residente e domiciliado(a) à ${
       patient.address || '_______________________'
-    },`,
-    `esteve sob tratamento odontológico neste consultório, no período das ${opts.startTime || '_____'} às ${
+    }, esteve sob tratamento odontológico neste consultório, no período das ${opts.startTime || '_____'} às ${
       opts.endTime || '_____'
-    } horas`,
-    `do dia ${opts.date || '____/____/________'}, necessitando de ${opts.days || '____'} dia(s) de convalescença.`,
+    } horas do dia ${opts.date || '____/____/________'}, necessitando de ${opts.days || '____'} dia(s) de convalescença.`,
     `C.I.D.: ${opts.cid || '_______________'}`,
-  ];
+  ].join('\n\n');
+}
 
+export async function generateAtestadoPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
+  const doc = new jsPDF();
+  let y = await drawLetterhead(doc, dentist, 'Atestado');
+  y = drawPatientInfoBlock(doc, y, patient);
+  y = drawBodyText(doc, y, bodyText);
+
+  y = ensureSpace(doc, y, 40);
   y += 6;
-  for (const line of lines) {
-    const wrapped = doc.splitTextToSize(line, CONTENT_WIDTH);
-    doc.text(wrapped, MARGIN, y);
-    y += wrapped.length * 6.5 + 4;
-  }
-
-  y += 10;
-  doc.text(`Imperatriz-MA, ____ / ____ / ________`, MARGIN, y);
-  y += 30;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(40, 38, 34);
+  doc.text('Imperatriz-MA, ____ / ____ / ________', MARGIN, y);
+  y += 24;
 
   await drawDentistSignatureBlock(doc, dentist, y, MARGIN, CONTENT_WIDTH);
 

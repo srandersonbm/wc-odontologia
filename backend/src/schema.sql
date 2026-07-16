@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS dentists (
   cro_number TEXT,
   cro_uf TEXT,
   signature_data BLOB,
-  signature_mime TEXT
+  signature_mime TEXT,
+  logo_data BLOB,
+  logo_mime TEXT
 );
 
 -- Pacientes são cadastros do consultório (tenant), sem login no sistema.

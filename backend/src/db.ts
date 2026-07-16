@@ -83,6 +83,8 @@ async function migrateColumnsAndTenants() {
   await addColumnIfMissing('dentists', 'cro_uf', 'TEXT');
   await addColumnIfMissing('dentists', 'signature_data', 'BLOB');
   await addColumnIfMissing('dentists', 'signature_mime', 'TEXT');
+  await addColumnIfMissing('dentists', 'logo_data', 'BLOB');
+  await addColumnIfMissing('dentists', 'logo_mime', 'TEXT');
   await addColumnIfMissing('plan_items', 'price_cents', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing('treatment_plans', 'completed_at', 'TEXT');
 

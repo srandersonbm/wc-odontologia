@@ -66,38 +66,60 @@ export function Periograma({ patientId }: { patientId: number }) {
     await api.put(`/patients/${patientId}/perio/tooth`, next);
   };
 
+  const hasData = sites.length > 0 || teeth.length > 0;
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="card p-5">
-      <h2 className="font-semibold mb-1" style={{ color: 'var(--ink)' }}>
-        Periograma
-      </h2>
-      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
-        Profundidade de sondagem (mm) e sangramento em 3 pontos por face, mobilidade e furca por dente.
-      </p>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-3"
+      >
+        <div className="text-left">
+          <h2 className="font-semibold" style={{ color: 'var(--ink)' }}>
+            Periograma
+          </h2>
+          {!open && (
+            <p className="text-xs mt-0.5" style={{ color: 'var(--ink-faint)' }}>
+              {hasData ? 'Com medidas registradas' : 'Nenhuma medida registrada ainda'}
+            </p>
+          )}
+        </div>
+        <span style={{ color: 'var(--ink-faint)', transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
 
-      <div className="flex flex-col gap-6">
-        <PerioArch title="Arcada superior" order={UPPER_ORDER} siteMap={siteMap} toothMap={toothMap} onSite={saveSite} onTooth={saveTooth} />
-        <PerioArch title="Arcada inferior" order={LOWER_ORDER} siteMap={siteMap} toothMap={toothMap} onSite={saveSite} onTooth={saveTooth} />
-      </div>
+      {open && (
+        <>
+          <p className="text-sm mt-3 mb-4" style={{ color: 'var(--ink-soft)' }}>
+            Profundidade de sondagem (mm) e sangramento em 3 pontos por face, mobilidade e furca por dente.
+          </p>
 
-      <div className="flex flex-wrap items-center gap-4 mt-4 text-xs" style={{ color: 'var(--ink-faint)' }}>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block rounded" style={{ width: 12, height: 12, background: 'var(--sage)' }} />
-          1–3mm
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block rounded" style={{ width: 12, height: 12, background: 'var(--honey-soft)' }} />
-          4–5mm
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block rounded" style={{ width: 12, height: 12, background: 'var(--danger-soft)' }} />
-          6mm+
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: 'var(--danger)' }} />
-          Sangramento à sondagem
-        </span>
-      </div>
+          <div className="flex flex-col gap-6">
+            <PerioArch title="Arcada superior" order={UPPER_ORDER} siteMap={siteMap} toothMap={toothMap} onSite={saveSite} onTooth={saveTooth} />
+            <PerioArch title="Arcada inferior" order={LOWER_ORDER} siteMap={siteMap} toothMap={toothMap} onSite={saveSite} onTooth={saveTooth} />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 mt-4 text-xs" style={{ color: 'var(--ink-faint)' }}>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block rounded" style={{ width: 12, height: 12, background: 'var(--sage)' }} />
+              1–3mm
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block rounded" style={{ width: 12, height: 12, background: 'var(--honey-soft)' }} />
+              4–5mm
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block rounded" style={{ width: 12, height: 12, background: 'var(--danger-soft)' }} />
+              6mm+
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: 'var(--danger)' }} />
+              Sangramento à sondagem
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

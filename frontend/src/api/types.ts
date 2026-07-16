@@ -12,6 +12,7 @@ export interface AuthUser {
   croNumber?: string;
   croUf?: string;
   signatureDataUrl?: string | null;
+  logoDataUrl?: string | null;
 }
 
 export interface Dentist {
@@ -186,6 +187,8 @@ export interface AnamnesisData {
   bruxismo?: 'nao' | 'diurno' | 'noturno';
   usaProtese?: 'sim' | 'nao';
   usaProteseQual?: string;
+  usaAparelhoOrtodontico?: 'sim' | 'nao';
+  usaImplante?: 'sim' | 'nao';
   jaFezCanal?: 'sim' | 'nao';
   sobCuidadosMedicos?: 'sim' | 'nao';
   sobCuidadosMedicosMotivo?: string;

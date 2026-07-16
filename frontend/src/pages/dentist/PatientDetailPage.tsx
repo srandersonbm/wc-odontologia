@@ -15,8 +15,13 @@ import { SignedDocuments } from '../../components/SignedDocuments';
 import { PatientExtraDocuments } from '../../components/PatientExtraDocuments';
 import { Odontograma } from '../../components/Odontograma';
 import { Periograma } from '../../components/Periograma';
+import { DocumentTextModal } from '../../components/DocumentTextModal';
 import { useAuth } from '../../context/AuthContext';
 import {
+  buildAnamnesisText,
+  buildAtestadoText,
+  buildTermoText,
+  buildTreatmentPlanText,
   formatCents,
   generateAnamnesisPdf,
   generateAtestadoPdf,
@@ -35,6 +40,9 @@ export function PatientDetailPage() {
   const [anamnesisOpen, setAnamnesisOpen] = useState(false);
   const [atestadoOpen, setAtestadoOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [docPreview, setDocPreview] = useState<{ title: string; text: string; run: (text: string) => void } | null>(
+    null
+  );
 
   const load = () => {
     api.get<Patient>(`/patients/${id}`).then(setPatient);
@@ -119,7 +127,13 @@ export function PatientDetailPage() {
                 Editar
               </button>
               <button
-                onClick={() => generateAnamnesisPdf(patient, user, anamnesis.data)}
+                onClick={() =>
+                  setDocPreview({
+                    title: 'Anamnese — revisar texto',
+                    text: buildAnamnesisText(anamnesis.data),
+                    run: (text) => generateAnamnesisPdf(patient, user, text),
+                  })
+                }
                 className="text-sm font-medium"
                 style={{ color: 'var(--honey-deep)' }}
               >
@@ -161,7 +175,17 @@ export function PatientDetailPage() {
         </h2>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <Button variant="ghost" onClick={() => generateTermoPdf(patient, user)} className="mb-2">
+            <Button
+              variant="ghost"
+              onClick={() =>
+                setDocPreview({
+                  title: 'Termo de consentimento — revisar texto',
+                  text: buildTermoText(patient, user),
+                  run: (text) => generateTermoPdf(patient, user, text),
+                })
+              }
+              className="mb-2"
+            >
               Gerar termo de consentimento
             </Button>
             <SignedDocuments patientId={patient.id} type="TERMO" label="Enviar termo assinado" />
@@ -225,8 +249,23 @@ export function PatientDetailPage() {
         open={atestadoOpen}
         onClose={() => setAtestadoOpen(false)}
         onGenerate={(opts) => {
-          generateAtestadoPdf(patient, user, opts);
           setAtestadoOpen(false);
+          setDocPreview({
+            title: 'Atestado — revisar texto',
+            text: buildAtestadoText(patient, opts),
+            run: (text) => generateAtestadoPdf(patient, user, text),
+          });
+        }}
+      />
+
+      <DocumentTextModal
+        open={!!docPreview}
+        title={docPreview?.title || ''}
+        defaultText={docPreview?.text || ''}
+        onClose={() => setDocPreview(null)}
+        onConfirm={(text) => {
+          docPreview?.run(text);
+          setDocPreview(null);
         }}
       />
 
@@ -550,6 +589,7 @@ function PlanCard({
   const [editItem, setEditItem] = useState<TreatmentPlan['items'][number] | null>(null);
   const [scheduleItem, setScheduleItem] = useState<TreatmentPlan['items'][number] | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [planDocPreview, setPlanDocPreview] = useState<string | null>(null);
 
   const toggleDone = async (itemId: number, status: string) => {
     await api.patch(`/treatment-plans/items/${itemId}`, {
@@ -607,7 +647,7 @@ function PlanCard({
           </span>
           {user && (
             <button
-              onClick={() => generateTreatmentPlanPdf(patient, user, plan)}
+              onClick={() => setPlanDocPreview(buildTreatmentPlanText(plan))}
               className="text-xs px-2.5 py-1.5 rounded-lg font-medium"
               style={{ color: 'var(--honey-deep)', background: 'var(--honey-soft)' }}
             >
@@ -745,6 +785,18 @@ function PlanCard({
         onConfirm={deletePlan}
         onCancel={() => setDeleteOpen(false)}
       />
+      {user && (
+        <DocumentTextModal
+          open={planDocPreview !== null}
+          title="Plano de tratamento — revisar texto"
+          defaultText={planDocPreview || ''}
+          onClose={() => setPlanDocPreview(null)}
+          onConfirm={(text) => {
+            generateTreatmentPlanPdf(patient, user, plan, text);
+            setPlanDocPreview(null);
+          }}
+        />
+      )}
     </motion.div>
   );
 }
