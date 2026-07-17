@@ -792,7 +792,7 @@ function PlanCard({
           defaultText={planDocPreview || ''}
           onClose={() => setPlanDocPreview(null)}
           onConfirm={(text) => {
-            generateTreatmentPlanPdf(patient, user, plan, text);
+            generateTreatmentPlanPdf(patient, user, text);
             setPlanDocPreview(null);
           }}
         />

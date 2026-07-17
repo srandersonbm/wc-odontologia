@@ -204,7 +204,7 @@ export function buildTreatmentPlanText(plan: TreatmentPlan): string {
     .join('\n\n');
 }
 
-export async function generateTreatmentPlanPdf(patient: Patient, dentist: AuthUser, plan: TreatmentPlan, bodyText: string) {
+export async function generateTreatmentPlanPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
   const doc = new jsPDF();
   let y = await drawLetterhead(doc, dentist, 'Plano de Tratamento Odontológico');
   y = drawPatientInfoBlock(doc, y, patient);
