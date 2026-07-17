@@ -29,7 +29,6 @@ export interface Patient {
   email?: string;
   phone?: string;
   birthDate?: string;
-  rg?: string;
   cpf?: string;
   profession?: string;
   maritalStatus?: string;

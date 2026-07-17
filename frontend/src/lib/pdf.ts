@@ -1,5 +1,4 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import type { AnamnesisData, AuthUser, Patient, TreatmentPlan } from '../api/types';
 
 const PAGE_WIDTH = 210;
@@ -85,28 +84,6 @@ async function drawLetterhead(doc: jsPDF, dentist: AuthUser, title: string): Pro
   return y + 10;
 }
 
-// Bloco com os dados do paciente que o sistema já possui — sempre incluído
-// automaticamente, não faz parte do texto editável do documento.
-function drawPatientInfoBlock(doc: jsPDF, y: number, patient: Patient): number {
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 1.2, textColor: [40, 38, 34] },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 30 },
-      2: { fontStyle: 'bold', cellWidth: 30 },
-    },
-    body: [
-      ['Paciente', patient.name, 'Data de nasc.', patient.birthDate || '—'],
-      ['CPF', patient.cpf || '—', 'RG', patient.rg || '—'],
-      ['Telefone', patient.phone || '—', 'Profissão', patient.profession || '—'],
-      ['Endereço', patient.address || '—', 'Cidade/UF', patient.city ? `${patient.city}/${patient.state || '—'}` : '—'],
-    ],
-  });
-  return (doc as any).lastAutoTable.finalY + 6;
-}
-
 // Texto do documento (já editado pelo usuário) — parágrafos separados por
 // linha em branco, cada um quebrado automaticamente na largura da página.
 function drawBodyText(doc: jsPDF, y: number, text: string): number {
@@ -189,11 +166,12 @@ function ensureSpace(doc: jsPDF, y: number, needed: number): number {
 
 // --- Plano de tratamento ---------------------------------------------------
 
-export function buildTreatmentPlanText(plan: TreatmentPlan): string {
+export function buildTreatmentPlanText(patient: Patient, plan: TreatmentPlan): string {
   const items =
     plan.items.map((item, i) => `${i + 1}. ${item.title} — ${formatCents(item.priceCents)}`).join('\n') ||
     'Nenhum procedimento incluído neste plano.';
   return [
+    `Paciente: ${patient.name}`,
     `Plano: ${plan.title}`,
     items,
     `Total: ${formatCents(plan.totalCents)}`,
@@ -207,7 +185,6 @@ export function buildTreatmentPlanText(plan: TreatmentPlan): string {
 export async function generateTreatmentPlanPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
   const doc = new jsPDF();
   let y = await drawLetterhead(doc, dentist, 'Plano de Tratamento Odontológico');
-  y = drawPatientInfoBlock(doc, y, patient);
   y = drawBodyText(doc, y, bodyText);
 
   y += 6;
@@ -262,7 +239,7 @@ const anamnesisFields: Array<{ key: keyof AnamnesisData; label: string }> = [
 
 const yesNoLabel: Record<string, string> = { sim: 'Sim', nao: 'Não', diurno: 'Diurno', noturno: 'Noturno' };
 
-export function buildAnamnesisText(data: AnamnesisData): string {
+export function buildAnamnesisText(patient: Patient, data: AnamnesisData): string {
   const condicoes = (data.condicoes || []).join(', ');
   const lines = anamnesisFields
     .map((f) => {
@@ -276,6 +253,7 @@ export function buildAnamnesisText(data: AnamnesisData): string {
   if (condicoes) lines.splice(9, 0, `Já foi acometido de alguma doença: ${condicoes}`);
 
   return [
+    `Paciente: ${patient.name}${patient.birthDate ? ` — nascido(a) em ${patient.birthDate}` : ''}`,
     lines.join('\n'),
     'Declaro que as informações acima prestadas são verdadeiras e que fui devidamente esclarecido(a) sobre o planejamento e os procedimentos odontológicos a serem realizados em meu caso.',
   ].join('\n\n');
@@ -284,7 +262,6 @@ export function buildAnamnesisText(data: AnamnesisData): string {
 export async function generateAnamnesisPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
   const doc = new jsPDF();
   let y = await drawLetterhead(doc, dentist, 'Ficha de Anamnese Odontológica');
-  y = drawPatientInfoBlock(doc, y, patient);
   y = drawBodyText(doc, y, bodyText);
 
   y += 6;
@@ -304,9 +281,9 @@ export async function generateAnamnesisPdf(patient: Patient, dentist: AuthUser, 
 export function buildTermoText(patient: Patient, dentist: AuthUser): string {
   const intro =
     `O presente documento é firmado entre o(a) cirurgião-dentista ${dentist.name} e o(a) Sr.(a) ` +
-    `${patient.name}, profissão ${patient.profession || '_______________'}, portador(a) do RG ${
-      patient.rg || '_______________'
-    }, CPF ${patient.cpf || '_______________'}, residente e domiciliado(a) à ${
+    `${patient.name}, profissão ${patient.profession || '_______________'}, CPF ${
+      patient.cpf || '_______________'
+    }, residente e domiciliado(a) à ${
       patient.address || '_______________'
     }, na cidade de ${patient.city || '_____________'}, estado de ${patient.state || '___'}.`;
 
@@ -326,7 +303,6 @@ export function buildTermoText(patient: Patient, dentist: AuthUser): string {
 export async function generateTermoPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
   const doc = new jsPDF();
   let y = await drawLetterhead(doc, dentist, 'Termo de Consentimento Livre e Esclarecido');
-  y = drawPatientInfoBlock(doc, y, patient);
   y = drawBodyText(doc, y, bodyText);
 
   y = ensureSpace(doc, y, 40);
@@ -353,26 +329,19 @@ export interface AtestadoOptions {
   startTime: string;
   endTime: string;
   days: string;
-  cid: string;
 }
 
 export function buildAtestadoText(patient: Patient, opts: AtestadoOptions): string {
-  return [
-    `Atesto para fins ${opts.finalidade || '_______________________'} que ${patient.name}, portador(a) do RG nº ${
-      patient.rg || '_______________'
-    }, residente e domiciliado(a) à ${
-      patient.address || '_______________________'
-    }, esteve sob tratamento odontológico neste consultório, no período das ${opts.startTime || '_____'} às ${
-      opts.endTime || '_____'
-    } horas do dia ${opts.date || '____/____/________'}, necessitando de ${opts.days || '____'} dia(s) de convalescença.`,
-    `C.I.D.: ${opts.cid || '_______________'}`,
-  ].join('\n\n');
+  return `Atesto para fins ${opts.finalidade || '_______________________'} que ${patient.name}, residente e domiciliado(a) à ${
+    patient.address || '_______________________'
+  }, esteve sob tratamento odontológico neste consultório, no período das ${opts.startTime || '_____'} às ${
+    opts.endTime || '_____'
+  } horas do dia ${opts.date || '____/____/________'}, necessitando de ${opts.days || '____'} dia(s) de convalescença.`;
 }
 
 export async function generateAtestadoPdf(patient: Patient, dentist: AuthUser, bodyText: string) {
   const doc = new jsPDF();
   let y = await drawLetterhead(doc, dentist, 'Atestado');
-  y = drawPatientInfoBlock(doc, y, patient);
   y = drawBodyText(doc, y, bodyText);
 
   y = ensureSpace(doc, y, 40);

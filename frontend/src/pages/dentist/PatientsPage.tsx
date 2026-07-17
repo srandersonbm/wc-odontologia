@@ -165,7 +165,7 @@ function NewPatientModal({
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
         <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
-          Dados como RG, CPF e endereço podem ser preenchidos depois, na ficha do paciente.
+          Dados como CPF e endereço podem ser preenchidos depois, na ficha do paciente.
         </p>
         {error && (
           <p className="text-sm" style={{ color: 'var(--danger)' }}>

@@ -39,7 +39,7 @@ router.get('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
 
 router.get('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const patient = await db.get(
-    `SELECT id, name, email, phone, birth_date as birthDate, rg, cpf, profession,
+    `SELECT id, name, email, phone, birth_date as birthDate, cpf, profession,
             marital_status as maritalStatus, address, city, state, created_at as createdAt
      FROM patients WHERE id = ? AND tenant_id = ?`,
     [req.params.id, req.user!.tenantId]
@@ -53,7 +53,6 @@ const updatePatientSchema = z.object({
   email: z.string().email().or(z.literal('')).nullable().optional(),
   phone: z.string().nullable().optional(),
   birthDate: z.string().nullable().optional(),
-  rg: z.string().nullable().optional(),
   cpf: z.string().nullable().optional(),
   profession: z.string().nullable().optional(),
   maritalStatus: z.string().nullable().optional(),

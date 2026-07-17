@@ -100,7 +100,6 @@ export function PatientDetailPage() {
           </button>
         </div>
         <div className="grid sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
-          <InfoField label="RG" value={patient.rg} />
           <InfoField label="CPF" value={patient.cpf} />
           <InfoField label="Data de nascimento" value={patient.birthDate} />
           <InfoField label="Profissão" value={patient.profession} />
@@ -130,7 +129,7 @@ export function PatientDetailPage() {
                 onClick={() =>
                   setDocPreview({
                     title: 'Anamnese — revisar texto',
-                    text: buildAnamnesisText(anamnesis.data),
+                    text: buildAnamnesisText(patient, anamnesis.data),
                     run: (text) => generateAnamnesisPdf(patient, user, text),
                   })
                 }
@@ -451,7 +450,6 @@ function EditPatientModal({
         email: form.email,
         phone: form.phone,
         birthDate: form.birthDate,
-        rg: form.rg,
         cpf: form.cpf,
         profession: form.profession,
         maritalStatus: form.maritalStatus,
@@ -480,9 +478,6 @@ function EditPatientModal({
           </Field>
           <Field label="Data de nascimento">
             <Input type="date" value={form.birthDate || ''} onChange={(e) => upd('birthDate', e.target.value)} />
-          </Field>
-          <Field label="RG">
-            <Input value={form.rg || ''} onChange={(e) => upd('rg', e.target.value)} />
           </Field>
           <Field label="CPF">
             <Input value={form.cpf || ''} onChange={(e) => upd('cpf', e.target.value)} />
@@ -524,7 +519,6 @@ function AtestadoModal({
     startTime: string;
     endTime: string;
     days: string;
-    cid: string;
   }) => void;
 }) {
   const [finalidade, setFinalidade] = useState('');
@@ -532,14 +526,13 @@ function AtestadoModal({
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [days, setDays] = useState('');
-  const [cid, setCid] = useState('');
 
   return (
     <Modal open={open} onClose={onClose} title="Emitir atestado">
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          onGenerate({ finalidade, date, startTime, endTime, days, cid });
+          onGenerate({ finalidade, date, startTime, endTime, days });
         }}
         className="flex flex-col gap-4"
       >
@@ -557,14 +550,9 @@ function AtestadoModal({
             <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Dias de convalescença">
-            <Input value={days} onChange={(e) => setDays(e.target.value)} />
-          </Field>
-          <Field label="C.I.D. (opcional)">
-            <Input value={cid} onChange={(e) => setCid(e.target.value)} />
-          </Field>
-        </div>
+        <Field label="Dias de convalescença">
+          <Input value={days} onChange={(e) => setDays(e.target.value)} />
+        </Field>
         <Button type="submit" variant="honey">
           Gerar PDF do atestado
         </Button>
@@ -647,7 +635,7 @@ function PlanCard({
           </span>
           {user && (
             <button
-              onClick={() => setPlanDocPreview(buildTreatmentPlanText(plan))}
+              onClick={() => setPlanDocPreview(buildTreatmentPlanText(patient, plan))}
               className="text-xs px-2.5 py-1.5 rounded-lg font-medium"
               style={{ color: 'var(--honey-deep)', background: 'var(--honey-soft)' }}
             >
