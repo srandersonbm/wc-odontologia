@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { logPatientEventDebounced } from '../events';
 
 const router = Router();
 const SITES = ['mv', 'v', 'dv', 'ml', 'l', 'dl'] as const;
@@ -69,6 +70,14 @@ router.put('/:id/perio/site', requireAuth, requireRole('DENTIST'), async (req, r
       suppuration ? 1 : 0,
     ]
   );
+  await logPatientEventDebounced({
+    tenantId: req.user!.tenantId,
+    patientId: req.params.id,
+    type: 'PERIO_UPDATED',
+    description: 'Periograma atualizado.',
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.json({ ok: true });
 });
 
@@ -96,6 +105,14 @@ router.put('/:id/perio/tooth', requireAuth, requireRole('DENTIST'), async (req, 
        updated_at = datetime('now')`,
     [req.user!.tenantId, req.params.id, toothFdi, mobility ?? 0, furcation ?? 0]
   );
+  await logPatientEventDebounced({
+    tenantId: req.user!.tenantId,
+    patientId: req.params.id,
+    type: 'PERIO_UPDATED',
+    description: 'Periograma atualizado.',
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.json({ ok: true });
 });
 

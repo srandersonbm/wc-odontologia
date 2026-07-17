@@ -73,6 +73,38 @@ async function migrateLegacyShape() {
   `);
 }
 
+// SQLite não permite ALTER de uma CHECK constraint existente — para adicionar o
+// status NO_SHOW a bancos já criados, a tabela precisa ser recriada e os dados copiados.
+async function migratePlanItemsNoShow() {
+  if (!(await tableExists('plan_items'))) return;
+  const res = await client.execute({
+    sql: "SELECT sql FROM sqlite_master WHERE type='table' AND name = 'plan_items'",
+    args: [],
+  });
+  const currentSql = (res.rows[0] as any)?.sql as string | undefined;
+  if (!currentSql || currentSql.includes('NO_SHOW')) return;
+
+  await client.executeMultiple(`
+    CREATE TABLE plan_items_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL REFERENCES treatment_plans(id) ON DELETE CASCADE,
+      procedure_type_id INTEGER REFERENCES procedure_types(id),
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SCHEDULED', 'DONE', 'NO_SHOW')),
+      scheduled_date TEXT,
+      start_time TEXT,
+      end_time TEXT,
+      notes TEXT,
+      price_cents INTEGER NOT NULL DEFAULT 0,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO plan_items_new SELECT * FROM plan_items;
+    DROP TABLE plan_items;
+    ALTER TABLE plan_items_new RENAME TO plan_items;
+  `);
+}
+
 async function migrateColumnsAndTenants() {
   await addColumnIfMissing('users', 'tenant_id', 'INTEGER');
   await addColumnIfMissing('dentists', 'phone', 'TEXT');
@@ -98,4 +130,5 @@ export async function initDb() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
   await client.executeMultiple(schema);
   await migrateColumnsAndTenants();
+  await migratePlanItemsNoShow();
 }

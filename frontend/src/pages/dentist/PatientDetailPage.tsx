@@ -13,6 +13,7 @@ import { Field, Input, Select, Textarea } from '../../components/ui/Field';
 import { AnamnesisForm } from '../../components/AnamnesisForm';
 import { SignedDocuments } from '../../components/SignedDocuments';
 import { PatientExtraDocuments } from '../../components/PatientExtraDocuments';
+import { PatientActivityTimeline } from '../../components/PatientActivityTimeline';
 import { Odontograma } from '../../components/Odontograma';
 import { Periograma } from '../../components/Periograma';
 import { DocumentTextModal } from '../../components/DocumentTextModal';
@@ -224,6 +225,9 @@ export function PatientDetailPage() {
 
       {/* Documentação extra — arquivos variados relacionados ao paciente */}
       <PatientExtraDocuments patientId={patient.id} />
+
+      {/* Histórico de atividades — auditoria: cadastro, documentos, faltas, remarcações etc. */}
+      <PatientActivityTimeline patientId={patient.id} />
 
       <NewPlanModal
         open={newPlanOpen}
@@ -586,6 +590,13 @@ function PlanCard({
     onChange();
   };
 
+  const toggleNoShow = async (itemId: number, status: string) => {
+    await api.patch(`/treatment-plans/items/${itemId}`, {
+      status: status === 'NO_SHOW' ? 'PENDING' : 'NO_SHOW',
+    });
+    onChange();
+  };
+
   const removeItem = async (itemId: number) => {
     await api.delete(`/treatment-plans/items/${itemId}`);
     onChange();
@@ -660,24 +671,25 @@ function PlanCard({
                 onClick={() => toggleDone(item.id, item.status)}
                 className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
                 style={{
-                  borderColor: item.status === 'DONE' ? 'var(--honey)' : 'var(--line)',
-                  background: item.status === 'DONE' ? 'var(--honey)' : 'transparent',
+                  borderColor: item.status === 'DONE' ? 'var(--honey)' : item.status === 'NO_SHOW' ? 'var(--danger)' : 'var(--line)',
+                  background: item.status === 'DONE' ? 'var(--honey)' : item.status === 'NO_SHOW' ? 'var(--danger)' : 'transparent',
                   color: '#fff',
                   fontSize: '11px',
                 }}
               >
-                {item.status === 'DONE' ? '✓' : ''}
+                {item.status === 'DONE' ? '✓' : item.status === 'NO_SHOW' ? '!' : ''}
               </button>
               <div className="min-w-0">
                 <p
                   className="text-sm truncate"
                   style={{
-                    color: 'var(--ink)',
+                    color: item.status === 'NO_SHOW' ? 'var(--danger)' : 'var(--ink)',
                     textDecoration: item.status === 'DONE' ? 'line-through' : 'none',
                     opacity: item.status === 'DONE' ? 0.55 : 1,
                   }}
                 >
                   {item.title}
+                  {item.status === 'NO_SHOW' ? ' · não compareceu' : ''}
                 </p>
                 <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
                   {item.procedureName ? `${item.procedureName} · ` : ''}
@@ -704,6 +716,15 @@ function PlanCard({
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 Agendar
+              </button>
+              <button
+                onClick={() => toggleNoShow(item.id, item.status)}
+                className="text-xs px-2 py-1 rounded-md transition-colors"
+                style={{ color: 'var(--danger)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--danger-soft)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                {item.status === 'NO_SHOW' ? 'Reverter falta' : 'Não compareceu'}
               </button>
               <button
                 onClick={() => removeItem(item.id)}

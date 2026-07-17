@@ -3,6 +3,14 @@ import multer from 'multer';
 import { z } from 'zod';
 import { db } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { logPatientEvent } from '../events';
+
+const documentTypeLabels: Record<string, string> = {
+  ANAMNESIS: 'Anamnese',
+  TREATMENT_PLAN: 'Plano de tratamento',
+  TERMO: 'Termo de consentimento',
+  ATESTADO: 'Atestado',
+};
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -62,6 +70,14 @@ router.post(
         req.file.buffer,
       ]
     );
+    await logPatientEvent({
+      tenantId: req.user!.tenantId,
+      patientId: req.params.id,
+      type: 'DOCUMENT_UPLOADED',
+      description: `Documento assinado enviado: ${documentTypeLabels[parsed.data.type] || parsed.data.type} (${req.file.originalname}).`,
+      actorId: req.user!.id,
+      actorName: req.user!.name,
+    });
     res.status(201).json({ id: info.lastInsertRowid });
   }
 );
@@ -127,6 +143,14 @@ router.post(
        VALUES (?, ?, ?, ?, ?, ?)`,
       [req.user!.tenantId, req.params.id, parsed.data.title, req.file.originalname, req.file.mimetype, req.file.buffer]
     );
+    await logPatientEvent({
+      tenantId: req.user!.tenantId,
+      patientId: req.params.id,
+      type: 'EXTRA_DOCUMENT_UPLOADED',
+      description: `Documento anexado: "${parsed.data.title}" (${req.file.originalname}).`,
+      actorId: req.user!.id,
+      actorName: req.user!.name,
+    });
     res.status(201).json({ id: info.lastInsertRowid });
   }
 );

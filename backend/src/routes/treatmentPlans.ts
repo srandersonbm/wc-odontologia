@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { logPatientEvent } from '../events';
 
 const router = Router();
 
@@ -107,6 +108,14 @@ router.post('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
     'INSERT INTO treatment_plans (patient_id, dentist_id, title, notes) VALUES (?, ?, ?, ?)',
     [patientId, req.user!.id, title, notes || null]
   );
+  await logPatientEvent({
+    tenantId: req.user!.tenantId,
+    patientId,
+    type: 'PLAN_CREATED',
+    description: `Plano de tratamento "${title}" criado.`,
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
@@ -120,8 +129,9 @@ const updatePlanSchema = z.object({
 router.patch('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const parsed = updatePlanSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
-  const plan = await db.get(
-    `SELECT tp.id FROM treatment_plans tp JOIN patients p ON p.id = tp.patient_id
+  const plan = await db.get<any>(
+    `SELECT tp.id, tp.title, tp.patient_id as patientId FROM treatment_plans tp
+     JOIN patients p ON p.id = tp.patient_id
      WHERE tp.id = ? AND p.tenant_id = ?`,
     [req.params.id, req.user!.tenantId]
   );
@@ -145,18 +155,41 @@ router.patch('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   if (sets.length) {
     params.push(req.params.id);
     await db.run(`UPDATE treatment_plans SET ${sets.join(', ')} WHERE id = ?`, params);
+
+    const title = fields.title ?? plan.title;
+    let description = `Plano "${title}" atualizado.`;
+    if (fields.status === 'COMPLETED') description = `Plano "${title}" marcado como concluído.`;
+    else if (fields.status === 'ACTIVE') description = `Plano "${title}" reaberto.`;
+    else if (fields.status === 'CANCELLED') description = `Plano "${title}" cancelado.`;
+    await logPatientEvent({
+      tenantId: req.user!.tenantId,
+      patientId: plan.patientId,
+      type: 'PLAN_UPDATED',
+      description,
+      actorId: req.user!.id,
+      actorName: req.user!.name,
+    });
   }
   res.json({ ok: true });
 });
 
 router.delete('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
-  const plan = await db.get(
-    `SELECT tp.id FROM treatment_plans tp JOIN patients p ON p.id = tp.patient_id
+  const plan = await db.get<any>(
+    `SELECT tp.id, tp.title, tp.patient_id as patientId FROM treatment_plans tp
+     JOIN patients p ON p.id = tp.patient_id
      WHERE tp.id = ? AND p.tenant_id = ?`,
     [req.params.id, req.user!.tenantId]
   );
   if (!plan) return res.status(404).json({ error: 'Plano não encontrado.' });
   await db.run('DELETE FROM treatment_plans WHERE id = ?', [req.params.id]);
+  await logPatientEvent({
+    tenantId: req.user!.tenantId,
+    patientId: plan.patientId,
+    type: 'PLAN_DELETED',
+    description: `Plano "${plan.title}" excluído.`,
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.status(204).end();
 });
 
@@ -208,7 +241,7 @@ router.post('/:id/items', requireAuth, requireRole('DENTIST'), async (req, res) 
 
 const updateItemSchema = z.object({
   title: z.string().min(2).optional(),
-  status: z.enum(['PENDING', 'SCHEDULED', 'DONE']).optional(),
+  status: z.enum(['PENDING', 'SCHEDULED', 'DONE', 'NO_SHOW']).optional(),
   procedureTypeId: z.number().int().nullable().optional(),
   priceCents: z.number().int().nonnegative().optional(),
   scheduledDate: z.string().nullable().optional(),
@@ -220,9 +253,14 @@ const updateItemSchema = z.object({
 router.patch('/items/:itemId', requireAuth, requireRole('DENTIST'), async (req, res) => {
   const parsed = updateItemSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
-  const item = await db.get<any>('SELECT id, scheduled_date as scheduledDate FROM plan_items WHERE id = ?', [
-    req.params.itemId,
-  ]);
+  const item = await db.get<any>(
+    `SELECT pi.id, pi.title, pi.status, pi.scheduled_date as scheduledDate, tp.patient_id as patientId
+     FROM plan_items pi
+     JOIN treatment_plans tp ON tp.id = pi.plan_id
+     JOIN patients p ON p.id = tp.patient_id
+     WHERE pi.id = ? AND p.tenant_id = ?`,
+    [req.params.itemId, req.user!.tenantId]
+  );
   if (!item) return res.status(404).json({ error: 'Procedimento não encontrado.' });
 
   const fields = parsed.data;
@@ -247,11 +285,48 @@ router.patch('/items/:itemId', requireAuth, requireRole('DENTIST'), async (req, 
   if (sets.length) {
     params.push(req.params.itemId);
     await db.run(`UPDATE plan_items SET ${sets.join(', ')} WHERE id = ?`, params);
+
+    const title = fields.title ?? item.title;
+    if (fields.status === 'NO_SHOW') {
+      await logPatientEvent({
+        tenantId: req.user!.tenantId,
+        patientId: item.patientId,
+        type: 'PLAN_ITEM_NO_SHOW',
+        description: `Paciente não compareceu ao procedimento "${title}"${
+          item.scheduledDate ? ` (agendado para ${item.scheduledDate})` : ''
+        }.`,
+        actorId: req.user!.id,
+        actorName: req.user!.name,
+      });
+    } else if (
+      fields.scheduledDate !== undefined &&
+      fields.scheduledDate &&
+      item.scheduledDate &&
+      fields.scheduledDate !== item.scheduledDate &&
+      item.status !== 'PENDING'
+    ) {
+      await logPatientEvent({
+        tenantId: req.user!.tenantId,
+        patientId: item.patientId,
+        type: 'PLAN_ITEM_RESCHEDULED',
+        description: `Atendimento "${title}" remarcado de ${item.scheduledDate} para ${fields.scheduledDate}.`,
+        actorId: req.user!.id,
+        actorName: req.user!.name,
+      });
+    }
   }
   res.json({ ok: true });
 });
 
 router.delete('/items/:itemId', requireAuth, requireRole('DENTIST'), async (req, res) => {
+  const item = await db.get(
+    `SELECT pi.id FROM plan_items pi
+     JOIN treatment_plans tp ON tp.id = pi.plan_id
+     JOIN patients p ON p.id = tp.patient_id
+     WHERE pi.id = ? AND p.tenant_id = ?`,
+    [req.params.itemId, req.user!.tenantId]
+  );
+  if (!item) return res.status(404).json({ error: 'Procedimento não encontrado.' });
   await db.run('DELETE FROM plan_items WHERE id = ?', [req.params.itemId]);
   res.status(204).end();
 });

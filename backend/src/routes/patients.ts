@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { logPatientEvent } from '../events';
 
 const router = Router();
 
@@ -23,6 +24,14 @@ router.post('/', requireAuth, requireRole('DENTIST'), async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?)`,
     [req.user!.tenantId, req.user!.id, name, email || null, phone || null, birthDate || null]
   );
+  await logPatientEvent({
+    tenantId: req.user!.tenantId,
+    patientId: info.lastInsertRowid,
+    type: 'PATIENT_CREATED',
+    description: 'Cadastro do paciente criado.',
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.status(201).json({ id: info.lastInsertRowid, name, email, phone, birthDate });
 });
 
@@ -84,8 +93,54 @@ router.patch('/:id', requireAuth, requireRole('DENTIST'), async (req, res) => {
   if (sets.length) {
     params.push(req.params.id);
     await db.run(`UPDATE patients SET ${sets.join(', ')} WHERE id = ?`, params);
+    await logPatientEvent({
+      tenantId: req.user!.tenantId,
+      patientId: req.params.id,
+      type: 'PATIENT_UPDATED',
+      description: 'Dados cadastrais atualizados.',
+      actorId: req.user!.id,
+      actorName: req.user!.name,
+    });
   }
   res.json({ ok: true });
+});
+
+// --- Histórico de atividades do paciente (auditoria) ---
+
+router.get('/:id/events', requireAuth, requireRole('DENTIST'), async (req, res) => {
+  const patient = await findPatientInTenant(req.params.id, req.user!.tenantId);
+  if (!patient) return res.status(404).json({ error: 'Paciente não encontrado.' });
+
+  const rows = await db.all(
+    `SELECT id, type, description, actor_name as actorName, created_at as createdAt
+     FROM patient_events WHERE patient_id = ? ORDER BY created_at DESC`,
+    [req.params.id]
+  );
+  res.json(rows);
+});
+
+const generatedDocSchema = z.object({
+  documentLabel: z.string().min(1),
+});
+
+// Registrado pelo front no momento em que um PDF é gerado (a geração é 100% local,
+// não passa por upload) — assim a emissão de documentos também aparece no histórico.
+router.post('/:id/events/document-generated', requireAuth, requireRole('DENTIST'), async (req, res) => {
+  const patient = await findPatientInTenant(req.params.id, req.user!.tenantId);
+  if (!patient) return res.status(404).json({ error: 'Paciente não encontrado.' });
+
+  const parsed = generatedDocSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Dados inválidos.' });
+
+  await logPatientEvent({
+    tenantId: req.user!.tenantId,
+    patientId: req.params.id,
+    type: 'DOCUMENT_GENERATED',
+    description: `PDF gerado: ${parsed.data.documentLabel}.`,
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
+  res.status(201).json({ ok: true });
 });
 
 // --- Anamnese (um registro por paciente, editável) ---
@@ -124,6 +179,14 @@ router.post('/:id/anamnesis', requireAuth, requireRole('DENTIST'), async (req, r
     req.params.id,
     JSON.stringify(parsed.data.data),
   ]);
+  await logPatientEvent({
+    tenantId: req.user!.tenantId,
+    patientId: req.params.id,
+    type: 'ANAMNESIS_CREATED',
+    description: 'Anamnese registrada.',
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
@@ -141,6 +204,14 @@ router.patch('/:id/anamnesis', requireAuth, requireRole('DENTIST'), async (req, 
     JSON.stringify(parsed.data.data),
     req.params.id,
   ]);
+  await logPatientEvent({
+    tenantId: req.user!.tenantId,
+    patientId: req.params.id,
+    type: 'ANAMNESIS_UPDATED',
+    description: 'Anamnese atualizada.',
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.json({ ok: true });
 });
 

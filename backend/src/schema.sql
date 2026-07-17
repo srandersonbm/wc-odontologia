@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS plan_items (
   plan_id INTEGER NOT NULL REFERENCES treatment_plans(id) ON DELETE CASCADE,
   procedure_type_id INTEGER REFERENCES procedure_types(id),
   title TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SCHEDULED', 'DONE')),
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SCHEDULED', 'DONE', 'NO_SHOW')),
   scheduled_date TEXT,
   start_time TEXT,
   end_time TEXT,
@@ -158,4 +158,18 @@ CREATE TABLE IF NOT EXISTS perio_teeth (
   furcation INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (patient_id, tooth_fdi)
+);
+
+-- Histórico/auditoria do paciente: registra criação/edição de cadastro, anamnese,
+-- planos de tratamento, odontograma, periograma, documentos emitidos/enviados e
+-- casos de falta ou remarcação de procedimentos.
+CREATE TABLE IF NOT EXISTS patient_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  actor_id INTEGER REFERENCES users(id),
+  actor_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

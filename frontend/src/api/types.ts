@@ -48,7 +48,7 @@ export interface ProcedureType {
 export interface PlanItem {
   id: number;
   title: string;
-  status: 'PENDING' | 'SCHEDULED' | 'DONE';
+  status: 'PENDING' | 'SCHEDULED' | 'DONE' | 'NO_SHOW';
   scheduledDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;
@@ -96,7 +96,7 @@ export interface Appointment {
 export interface PendingItem {
   id: number;
   title: string;
-  status: 'PENDING' | 'SCHEDULED' | 'DONE';
+  status: 'PENDING' | 'SCHEDULED' | 'DONE' | 'NO_SHOW';
   scheduledDate?: string | null;
   startTime?: string | null;
   procedureName?: string;
@@ -167,6 +167,30 @@ export interface PerioTooth {
   toothFdi: number;
   mobility: number;
   furcation: number;
+}
+
+export type PatientEventType =
+  | 'PATIENT_CREATED'
+  | 'PATIENT_UPDATED'
+  | 'ANAMNESIS_CREATED'
+  | 'ANAMNESIS_UPDATED'
+  | 'PLAN_CREATED'
+  | 'PLAN_UPDATED'
+  | 'PLAN_DELETED'
+  | 'PLAN_ITEM_NO_SHOW'
+  | 'PLAN_ITEM_RESCHEDULED'
+  | 'DOCUMENT_UPLOADED'
+  | 'EXTRA_DOCUMENT_UPLOADED'
+  | 'DOCUMENT_GENERATED'
+  | 'ODONTOGRAMA_UPDATED'
+  | 'PERIO_UPDATED';
+
+export interface PatientEvent {
+  id: number;
+  type: PatientEventType;
+  description: string;
+  actorName?: string;
+  createdAt: string;
 }
 
 export interface Anamnesis {

@@ -1,5 +1,13 @@
 import { jsPDF } from 'jspdf';
+import { api } from '../api/client';
 import type { AnamnesisData, AuthUser, Patient, TreatmentPlan } from '../api/types';
+
+// A geração de PDF é 100% local (client-side) — sem esse aviso ao backend, a emissão
+// de documentos nunca apareceria no histórico do paciente. Falha aqui não deve travar
+// o download do PDF, por isso os erros são apenas ignorados.
+function logDocumentGenerated(patientId: number, documentLabel: string) {
+  api.post(`/patients/${patientId}/events/document-generated`, { documentLabel }).catch(() => {});
+}
 
 const PAGE_WIDTH = 210;
 const MARGIN = 18;
@@ -198,6 +206,7 @@ export async function generateTreatmentPlanPdf(patient: Patient, dentist: AuthUs
   drawSignatureLine(doc, y, 'Assinatura do paciente ou responsável', MARGIN, CONTENT_WIDTH);
 
   doc.save(`plano-de-tratamento-${slug(patient.name)}.pdf`);
+  logDocumentGenerated(patient.id, 'Plano de tratamento');
 }
 
 // --- Anamnese ----------------------------------------------------------------
@@ -274,6 +283,7 @@ export async function generateAnamnesisPdf(patient: Patient, dentist: AuthUser, 
   drawSignatureLine(doc, y, 'Nome por extenso e assinatura (paciente ou responsável)', MARGIN, CONTENT_WIDTH);
 
   doc.save(`anamnese-${slug(patient.name)}.pdf`);
+  logDocumentGenerated(patient.id, 'Anamnese');
 }
 
 // --- Termo de consentimento --------------------------------------------------
@@ -319,6 +329,7 @@ export async function generateTermoPdf(patient: Patient, dentist: AuthUser, body
   drawSignatureLine(doc, y, 'Paciente', MARGIN + half + 10, half);
 
   doc.save(`termo-consentimento-${slug(patient.name)}.pdf`);
+  logDocumentGenerated(patient.id, 'Termo de consentimento');
 }
 
 // --- Atestado ------------------------------------------------------------------
@@ -355,6 +366,7 @@ export async function generateAtestadoPdf(patient: Patient, dentist: AuthUser, b
   await drawDentistSignatureBlock(doc, dentist, y, MARGIN, CONTENT_WIDTH);
 
   doc.save(`atestado-${slug(patient.name)}.pdf`);
+  logDocumentGenerated(patient.id, 'Atestado');
 }
 
 function slug(text: string): string {

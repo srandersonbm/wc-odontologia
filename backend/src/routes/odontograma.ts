@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { logPatientEvent } from '../events';
 
 const router = Router();
 
@@ -39,6 +40,14 @@ router.post('/:id/tooth-notes', requireAuth, requireRole('DENTIST'), async (req,
     `INSERT INTO tooth_notes (tenant_id, patient_id, tooth_fdi, note, dentist_id) VALUES (?, ?, ?, ?, ?)`,
     [req.user!.tenantId, req.params.id, parsed.data.toothFdi, parsed.data.note, req.user!.id]
   );
+  await logPatientEvent({
+    tenantId: req.user!.tenantId,
+    patientId: req.params.id,
+    type: 'ODONTOGRAMA_UPDATED',
+    description: `Observação adicionada ao dente ${parsed.data.toothFdi} no odontograma.`,
+    actorId: req.user!.id,
+    actorName: req.user!.name,
+  });
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
