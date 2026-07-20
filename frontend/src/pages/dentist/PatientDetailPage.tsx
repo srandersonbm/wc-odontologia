@@ -522,21 +522,19 @@ function AtestadoModal({
     date: string;
     startTime: string;
     endTime: string;
-    days: string;
   }) => void;
 }) {
   const [finalidade, setFinalidade] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [days, setDays] = useState('');
 
   return (
     <Modal open={open} onClose={onClose} title="Emitir atestado">
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          onGenerate({ finalidade, date, startTime, endTime, days });
+          onGenerate({ finalidade, date, startTime, endTime });
         }}
         className="flex flex-col gap-4"
       >
@@ -554,9 +552,6 @@ function AtestadoModal({
             <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
           </Field>
         </div>
-        <Field label="Dias de convalescença">
-          <Input value={days} onChange={(e) => setDays(e.target.value)} />
-        </Field>
         <Button type="submit" variant="honey">
           Gerar PDF do atestado
         </Button>
